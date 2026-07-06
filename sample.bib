@@ -1,0 +1,291 @@
+%Entries
+
+@inproceedings{Wang2018,
+author = {Wang, Liang and Li, Mengyuan and Zhang, Yinqian and Ristenpart, Thomas and Swift, Michael},
+title = {Peeking behind the curtains of serverless platforms},
+year = {2018},
+isbn = {9781931971447},
+publisher = {USENIX Association},
+address = {USA},
+abstract = {Serverless computing is an emerging paradigm in which an application's resource provisioning and scaling are managed by third-party services. Examples include AWS Lambda, Azure Functions, and Google Cloud Functions. Behind these services' easy-to-use APIs are opaque, complex infrastructure and management ecosystems. Taking on the viewpoint of a serverless customer, we conduct the largest measurement study to date, launching more than 50,000 function instances across these three services, in order to characterize their architectures, performance, and resource management efficiency. We explain how the platforms isolate the functions of different accounts, using either virtual machines or containers, which has important security implications. We characterize performance in terms of scalability, coldstart latency, and resource efficiency, with highlights including that AWS Lambda adopts a bin-packing-like strategy to maximize VM memory utilization, that severe contention between functions can arise in AWS and Azure, and that Google had bugs that allow customers to use resources for free.},
+booktitle = {Proceedings of the 2018 USENIX Conference on Usenix Annual Technical Conference},
+pages = {133–145},
+numpages = {13},
+location = {Boston, MA, USA},
+series = {USENIX ATC '18}
+}
+
+@inproceedings{Shahrad2020,
+author = {Shahrad, Mohammad and Fonseca, Rodrigo and Goiri, \'{I}\~{n}igo and Chaudhry, Gohar and Batum, Paul and Cooke, Jason and Laureano, Eduardo and Tresness, Colby and Russinovich, Mark and Bianchini, Ricardo},
+title = {Serverless in the wild: characterizing and optimizing the serverless workload at a large cloud provider},
+year = {2020},
+isbn = {978-1-939133-14-4},
+publisher = {USENIX Association},
+address = {USA},
+abstract = {Function as a Service (FaaS) has been gaining popularity as a way to deploy computations to serverless backends in the cloud. This paradigm shifts the complexity of allocating and provisioning resources to the cloud provider, which has to provide the illusion of always-available resources (i.e., fast function invocations without cold starts) at the lowest possible resource cost. Doing so requires the provider to deeply understand the characteristics of the FaaS workload. Unfortunately, there has been little to no public information on these characteristics. Thus, in this paper, we first characterize the entire production FaaS workload of Azure Functions. We show for example that most functions are invoked very infrequently, but there is an 8-order-of-magnitude range of invocation frequencies. Using observations from our characterization, we then propose a practical resource management policy that significantly reduces the number of function cold starts, while spending fewer resources than state-of-the-practice policies.},
+booktitle = {Proceedings of the 2020 USENIX Conference on Usenix Annual Technical Conference},
+articleno = {14},
+numpages = {14},
+series = {USENIX ATC'20}
+}
+
+@inproceedings{Du2020,
+author = {Du, Dong and Yu, Tianyi and Xia, Yubin and Zang, Binyu and Yan, Guanglu and Qin, Chenggang and Wu, Qixuan and Chen, Haibo},
+title = {Catalyzer: Sub-millisecond Startup for Serverless Computing with Initialization-less Booting},
+year = {2020},
+isbn = {9781450371025},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3373376.3378512},
+doi = {10.1145/3373376.3378512},
+abstract = {Serverless computing promises cost-efficiency and elasticity for high-productive software development. To achieve this, the serverless sandbox system must address two challenges: strong isolation between function instances, and low startup latency to ensure user experience. While strong isolation can be provided by virtualization-based sandboxes, the initialization of sandbox and application causes non-negligible startup overhead. Conventional sandbox systems fall short in low-latency startup due to their application-agnostic nature: they can only reduce the latency of sandbox initialization through hypervisor and guest kernel customization, which is inadequate and does not mitigate the majority of startup overhead.This paper proposes Catalyzer, a serverless sandbox system design providing both strong isolation and extremely fast function startup. Instead of booting from scratch, Catalyzer restores a virtualization-based function instance from a well-formed checkpoint image and thereby skips the initialization on the critical path (init-less). Catalyzer boosts the restore performance by on-demand recovering both user-level memory state and system state. We also propose a new OS primitive, sfork (sandbox fork), to further reduce the startup latency by directly reusing the state of a running sandbox instance. Fundamentally, Catalyzer removes the initialization cost by reusing state, which enables general optimizations for diverse serverless functions. The evaluation shows that Catalyzer reduces startup latency by orders of magnitude, achieves < 1ms latency in the best case, and significantly reduces the end-to-end latency for real-world workloads. Catalyzer has been adopted by Ant Financial, and we also present lessons learned from industrial development.},
+booktitle = {Proceedings of the Twenty-Fifth International Conference on Architectural Support for Programming Languages and Operating Systems},
+pages = {467–481},
+numpages = {15},
+keywords = {startup latency, serverless computing, operating system, checkpoint and restore},
+location = {Lausanne, Switzerland},
+series = {ASPLOS '20}
+}
+
+@article{Gaffney2022,
+author = {Gaffney, Kevin P. and Prammer, Martin and Brasfield, Larry and Hipp, D. Richard and Kennedy, Dan and Patel, Jignesh M.},
+title = {SQLite: past, present, and future},
+year = {2022},
+issue_date = {August 2022},
+publisher = {VLDB Endowment},
+volume = {15},
+number = {12},
+issn = {2150-8097},
+url = {https://doi.org/10.14778/3554821.3554842},
+doi = {10.14778/3554821.3554842},
+abstract = {In the two decades following its initial release, SQLite has become the most widely deployed database engine in existence. Today, SQLite is found in nearly every smartphone, computer, web browser, television, and automobile. Several factors are likely responsible for its ubiquity, including its in-process design, standalone codebase, extensive test suite, and cross-platform file format. While it supports complex analytical queries, SQLite is primarily designed for fast online transaction processing (OLTP), employing row-oriented execution and a B-tree storage format. However, fueled by the rise of edge computing and data science, there is a growing need for efficient in-process online analytical processing (OLAP). DuckDB, a database engine nicknamed "the SQLite for analytics", has recently emerged to meet this demand. While DuckDB has shown strong performance on OLAP benchmarks, it is unclear how SQLite compares. Furthermore, we are aware of no work that attempts to identify root causes for SQLite's performance behavior on OLAP workloads. In this paper, we discuss SQLite in the context of this changing workload landscape. We describe how SQLite evolved from its humble beginnings to the full-featured database engine it is today. We evaluate the performance of modern SQLite on three benchmarks, each representing a different flavor of in-process data management, including transactional, analytical, and blob processing. We delve into analytical data processing on SQLite, identifying key bottlenecks and weighing potential solutions. As a result of our optimizations, SQLite is now up to 4.2X faster on SSB. Finally, we discuss the future of SQLite, envisioning how it will evolve to meet new demands and challenges.},
+journal = {Proc. VLDB Endow.},
+month = aug,
+pages = {3535–3547},
+numpages = {13}
+}
+
+@article{Smith1978,
+author = {Smith, Alan Jay},
+title = {Sequentiality and prefetching in database systems},
+year = {1978},
+issue_date = {Sept. 1978},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {3},
+number = {3},
+issn = {0362-5915},
+url = {https://doi.org/10.1145/320263.320276},
+doi = {10.1145/320263.320276},
+abstract = {Sequentiality of access is an inherent characteristic of many database systems. We use this observation to develop an algorithm which selectively prefetches data blocks ahead of the point of reference. The number of blocks prefetched is chosen by using the empirical run length distribution and conditioning on the observed number of sequential block references immediately preceding reference to the current block. The optimal number of blocks to prefetch is estimated as a function of a number of “costs,” including the cost of accessing a block not resident in the buffer (a miss), the cost of fetching additional data blocks at fault times, and the cost of fetching blocks that are never referenced. We estimate this latter cost, described as memory pollution, in two ways. We consider the treatment (in the replacement algorithm) of prefetched blocks, whether they are treated as referenced or not, and find that it makes very little difference. Trace data taken from an operational IMS database system is analyzed and the results are presented. We show how to determine optimal block sizes. We find that anticipatory fetching of data can lead to significant improvements in system operation.},
+journal = {ACM Trans. Database Syst.},
+month = sep,
+pages = {223–247},
+numpages = {25},
+keywords = {sequentiality, prefetching, paging, dynamic programming, database systems, buffer management, IMS}
+}
+
+@inproceedings{Iyer2001,
+author = {Iyer, Sitaram and Druschel, Peter},
+title = {Anticipatory scheduling: a disk scheduling framework to overcome deceptive idleness in synchronous I/O},
+year = {2001},
+isbn = {1581133898},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/502034.502046},
+doi = {10.1145/502034.502046},
+abstract = {Disk schedulers in current operating systems are generally work-conserving, i.e., they schedule a request as soon as the previous request has finished. Such schedulers often require multiple outstanding requests from each process to meet system-level goals of performance and quality of service. Unfortunately, many common applications issue disk read requests in a synchronous manner, interspersing successive requests with short periods of computation. The scheduler chooses the next request too early; this induces deceptive idleness, a condition where the scheduler incorrectly assumes that the last request issuing process has no further requests, and becomes forced to switch to a request from another process.We propose the anticipatory disk scheduling framework to solve this problem in a simple, general and transparent way, based on the non-work-conserving scheduling discipline. Our FreeBSD implementation is observed to yield large benefits on a range of microbenchmarks and real workloads. The Apache webserver delivers between 29\% and 71\% more throughput on a disk-intensive workload. The Andrew filesystem benchmark runs faster by 8\%, due to a speedup of 54\% in its read-intensive phase. Variants of the TPC-B database benchmark exhibit improvements between 2\% and 60\%. Proportional-share schedulers are seen to achieve their contracts accurately and efficiently.},
+booktitle = {Proceedings of the Eighteenth ACM Symposium on Operating Systems Principles},
+pages = {117–130},
+numpages = {14},
+location = {Banff, Alberta, Canada},
+series = {SOSP '01}
+}
+
+@article{Effelsberg1984,
+author = {Effelsberg, Wolfgang and H{\"a}rder, Theo},
+title = {Principles of database buffer management},
+year = {1984},
+issue_date = {Dec. 1984},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {9},
+number = {4},
+issn = {0362-5915},
+url = {https://doi.org/10.1145/1994.2022},
+doi = {10.1145/1994.2022},
+abstract = {This paper discusses the implementation of a database buffer manager as a component of a DBMS. The interface between calling components of higher system layers and the buffer manager is described; the principal differences between virtual memory paging and database buffer management are outlined; the notion of referencing versus addressing of database pages is introduced; and the concept of fixing pages in the buffer to prevent uncontrolled replacement is explained.Three basic tasks have to be performed by the buffer manager: buffer search, allocation of frames to concurrent transactions, and page replacement. For each of these tasks, implementation alternatives are discussed and illustrated by examples from a performance evaluation project of a CODASYL DBMS.},
+journal = {ACM Trans. Database Syst.},
+month = dec,
+pages = {560–595},
+numpages = {36}
+}
+
+@INPROCEEDINGS{Chen2021,
+  author={Chen, Yu and Zhang, Yong and Wu, Jiacheng and Wang, Jin and Xing, Chunxiao},
+  booktitle={2021 IEEE 37th International Conference on Data Engineering (ICDE)}, 
+  title={Revisiting Data Prefetching for Database Systems with Machine Learning Techniques}, 
+  year={2021},
+  volume={},
+  number={},
+  pages={2165-2170},
+  keywords={Prefetching;Neural networks;Machine learning;Benchmark testing;Predictive models;Performance gain;Database systems},
+  doi={10.1109/ICDE51399.2021.00218}
+}
+
+@article{Yi2026,
+author = {Jie Yi and Xiaoliang Wang and Peiquan Jin},
+title = {Workload-Aware Buffer Prefetching for Database Systems},
+journal = {Data Science and Engineering},
+year = {2026},
+doi = {10.1007/s41019-025-00342-6}
+}
+
+@article{Yang2020,
+author = {Yang, Lei and Wu, Hong and Zhang, Tieying and Cheng, Xuntao and Li, Feifei and Zou, Lei and Wang, Yujie and Chen, Rongyao and Wang, Jianying and Huang, Gui},
+title = {Leaper: a learned prefetcher for cache invalidation in LSM-tree based storage engines},
+year = {2020},
+issue_date = {August 2020},
+publisher = {VLDB Endowment},
+volume = {13},
+number = {12},
+issn = {2150-8097},
+url = {https://doi.org/10.14778/3407790.3407803},
+doi = {10.14778/3407790.3407803},
+abstract = {Frequency-based cache replacement policies that work well on page-based database storage engines are no longer sufficient for the emerging LSM-tree (Log-Structure Merge-tree) based storage engines. Due to the append-only and copy-on-write techniques applied to accelerate writes, the state-of-the-art LSM-tree adopts mutable record blocks and issues frequent background operations (i.e., compaction, flush) to reorganize records in possibly every block. As a side-effect, such operations invalidate the corresponding entries in the cache for each involved record, causing sudden drops on the cache hit rates and spikes on access latency. Given the observation that existing methods cannot address this cache invalidation problem, we propose Leaper, a machine learning method to predict hot records in an LSM-tree storage engine and prefetch them into the cache without being disturbed by background operations. We implement Leaper in a state-of-the-art LSM-tree storage engine, X-Engine, as a light-weight plug-in. Evaluation results show that Leaper eliminates about 70\% cache invalidations and 99\% latency spikes with at most 0.95\% overheads as measured in real-world workloads.},
+journal = {Proc. VLDB Endow.},
+month = jul,
+pages = {1976–1989},
+numpages = {14}
+}
+
+@article{Funke2022,
+    author = "Henning Funke and Jan Mühlig and Jens Teubner",
+    title = "Low-latency query compilation",
+    journal = "The VLDB Journal",
+    volume = "31",
+    pages = "1171-1184",
+    year = "2022",
+    url = "https://doi.org/10.1007/s00778-022-00741-5"
+}
+
+@inproceedings{VanDeBogart2009,
+author = {VanDeBogart, Steve and Frost, Christopher and Kohler, Eddie},
+title = {Reducing seek overhead with application-directed prefetching},
+year = {2009},
+publisher = {USENIX Association},
+address = {USA},
+abstract = {An analysis of performance characteristics of modern disks finds that prefetching can improve the performance of nonsequential read access patterns by an order of magnitude or more, far more than demonstrated by prior work. Using this analysis, we design prefetching algorithms that make effective use of primary memory, and can sometimes gain additional speedups by reading unneeded data.We show when additional prefetching memory is most critical for performance. A contention controller automatically adjusts prefetching memory usage, preserving the benefits of prefetching while sharing available memory with other applications. When implemented in a library with some kernel changes, our prefetching system improves performance for some workloads of the GIMP image manipulation program and the SQLite database by factors of 4.9x to 20x.},
+booktitle = {Proceedings of the 2009 Conference on USENIX Annual Technical Conference},
+pages = {24},
+numpages = {1},
+location = {San Diego, California},
+series = {USENIX'09}
+}
+
+@inproceedings{Crotty2022,
+  title={Are You Sure You Want to Use MMAP in Your Database Management System?},
+  author={Andrew Crotty and Viktor Leis and Andrew Pavlo},
+  booktitle={Conference on Innovative Data Systems Research},
+  year={2022},
+  url={https://api.semanticscholar.org/CorpusID:245835402}
+}
+
+@article{Leis2023,
+author = {Leis, Viktor and Alhomssi, Adnan and Ziegler, Tobias and Loeck, Yannick and Dietrich, Christian},
+title = {Virtual-Memory Assisted Buffer Management},
+year = {2023},
+issue_date = {May 2023},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {1},
+number = {1},
+url = {https://doi.org/10.1145/3588687},
+doi = {10.1145/3588687},
+abstract = {Most database management systems cache pages from storage in a main memory buffer pool. To do this, they either rely on a hash table that translates page identifiers into pointers, or on pointer swizzling which avoids this translation. In this work, we propose vmcache, a buffer manager design that instead uses hardware-supported virtual memory to translate page identifiers to virtual memory addresses. In contrast to existing mmap-based approaches, the DBMS retains control over page faulting and eviction. Our design is portable across modern operating systems, supports arbitrary graph data, enables variable-sized pages, and is easy to implement. One downside of relying on virtual memory is that with fast storage devices the existing operating system primitives for manipulating the page table can become a performance bottleneck. As a second contribution, we therefore propose exmap, which implements scalable page table manipulation on Linux. Together, vmcache and exmap provide flexible, efficient, and scalable buffer management on multi-core CPUs and fast storage devices.},
+journal = {Proc. ACM Manag. Data},
+month = may,
+articleno = {7},
+numpages = {25},
+keywords = {buffer management, caching, database management systems, operating systems}
+}
+
+@article{Oh2015,
+  title={SQLite Optimization with Phase Change Memory for Mobile Applications},
+  author={Gihwan Oh and Sangchul Kim and Sang-Won Lee and Bongki Moon},
+  journal={Proc. VLDB Endow.},
+  year={2015},
+  volume={8},
+  pages={1454-1465},
+  url={https://api.semanticscholar.org/CorpusID:6098663}
+}
+
+@inproceedings{Kang2013,
+author = {Kang, Woon-Hak and Lee, Sang-Won and Moon, Bongki and Oh, Gi-Hwan and Min, Changwoo},
+title = {X-FTL: transactional FTL for SQLite databases},
+year = {2013},
+isbn = {9781450320375},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/2463676.2465326},
+doi = {10.1145/2463676.2465326},
+abstract = {In the era of smartphones and mobile computing, many popular applications such as Facebook, twitter, Gmail, and even Angry birds game manage their data using SQLite. This is mainly due to the development productivity and solid transactional support. For transactional atomicity, however, SQLite relies on less sophisticated but costlier page-oriented journaling mechanisms. Hence, this is often cited as the main cause of tardy responses in mobile applications.Flash memory does not allow data to be updated in place, and the copy-on-write strategy is adopted by most flash storage devices. In this paper, we propose X-FTL, a transactional flash translation layer(FTL) for SQLite databases. By offloading the burden of guaranteeing the transactional atomicity from a host system to flash storage and by taking advantage of the copy-on-write strategy used in modern FTLs, X-FTL drastically improves the transactional throughput almost for free without resorting to costly journaling schemes. We have implemented X-FTL on an SSD development board called OpenSSD, and modified SQLite and ext4 file system minimally to make them compatible with the extended abstractions provided by X-FTL. We demonstrate the effectiveness of X-FTL using real and synthetic SQLite workloads for smartphone applications, TPC-C benchmark for OLTP databases, and FIO benchmark for file systems.},
+booktitle = {Proceedings of the 2013 ACM SIGMOD International Conference on Management of Data},
+pages = {97–108},
+numpages = {12},
+keywords = {copy-on-write, flash storage devices, flash translation layer, sqlite, transactional atomicity},
+location = {New York, New York, USA},
+series = {SIGMOD '13}
+}
+
+@article{Kim2012,
+author = {Kim, Hyojun and Agrawal, Nitin and Ungureanu, Cristian},
+title = {Revisiting storage for smartphones},
+year = {2012},
+issue_date = {November 2012},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {8},
+number = {4},
+issn = {1553-3077},
+url = {https://doi.org/10.1145/2385603.2385607},
+doi = {10.1145/2385603.2385607},
+abstract = {Conventional wisdom holds that storage is not a big contributor to application performance on mobile devices. Flash storage (the type most commonly used today) draws little power, and its performance is thought to exceed that of the network subsystem. In this article, we present evidence that storage performance does indeed affect the performance of several common applications such as Web browsing, maps, application install, email, and Facebook. For several Android smartphones, we find that just by varying the underlying flash storage, performance over WiFi can typically vary between 100\% and 300\% across applications; in one extreme scenario, the variation jumped to over 2000\%. With a faster network (set up over USB), the performance variation rose even further. We identify the reasons for the strong correlation between storage and application performance to be a combination of poor flash device performance, random I/O from application databases, and heavy-handed use of synchronous writes. Based on our findings, we implement and evaluate a set of pilot solutions to address the storage performance deficiencies in smartphones.},
+journal = {ACM Trans. Storage},
+month = dec,
+articleno = {14},
+numpages = {25},
+keywords = {Android, Storage systems, mobile, mobile storage, smartphones}
+}
+
+@inproceedings{Jeong2013,
+author = {Jeong, Sooman and Lee, Kisung and Lee, Seongjin and Son, Seoungbum and Won, Youjip},
+title = {I/O stack optimization for smartphones},
+year = {2013},
+publisher = {USENIX Association},
+address = {USA},
+abstract = {The Android I/O stack consists of elaborate and mature components (SQLite, the EXT4 filesystem, interrupt-driven I/O, and NAND-based storage) whose integrated behavior is not well-orchestrated, which leaves a substantial room for an improvement. We overhauled the block I/O behavior of five filesystems (EXT4, XFS, BTRFS, NILFS, and F2FS) under each of the five different journaling modes of SQLite. We found that the most significant inefficiency originates from the fact that filesystem journals the database journaling activity; we refer to this as the JOJ (Journaling of Journal) anomaly. The JOJ overhead compounds in EXT4 when the bulky EXT4 journaling activity is triggered by an fsync() call from SQLite. We propose (i) the elimination of unnecessary metadata journaling for the filesystem, (ii) external journaling and (iii) polling-based I/O to improve the I/O performance, primarily to improve the efficiency of filesystem journaling in the SQLite environment. We examined the performance trade-offs for each combination of the five database journaling modes, five filesystems and three optimization techniques. When we applied three optimization techniques in existing Android I/O stack, the SQLite performance (inserts/sec) improved by 130\%. With the F2FS filesystem, WAL journaling mode (SQLite), and the combination of our optimization efforts, we improved the SQLite performance (inserts/sec) by 300\%, from 39 ins/sec to 157 ins/sec, compared to the stock Android I/O stack.},
+booktitle = {Proceedings of the 2013 USENIX Conference on Annual Technical Conference},
+pages = {309–320},
+numpages = {12},
+location = {San Jose, CA},
+series = {USENIX ATC'13}
+}
+
+@inproceedings{Cooper2010,
+author = {Cooper, Brian F. and Silberstein, Adam and Tam, Erwin and Ramakrishnan, Raghu and Sears, Russell},
+title = {Benchmarking cloud serving systems with YCSB},
+year = {2010},
+isbn = {9781450300360},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/1807128.1807152},
+doi = {10.1145/1807128.1807152},
+abstract = {While the use of MapReduce systems (such as Hadoop) for large scale data analysis has been widely recognized and studied, we have recently seen an explosion in the number of systems developed for cloud data serving. These newer systems address "cloud OLTP" applications, though they typically do not support ACID transactions. Examples of systems proposed for cloud serving use include BigTable, PNUTS, Cassandra, HBase, Azure, CouchDB, SimpleDB, Voldemort, and many others. Further, they are being applied to a diverse range of applications that differ considerably from traditional (e.g., TPC-C like) serving workloads. The number of emerging cloud serving systems and the wide range of proposed applications, coupled with a lack of apples-to-apples performance comparisons, makes it difficult to understand the tradeoffs between systems and the workloads for which they are suited. We present the "Yahoo! Cloud Serving Benchmark" (YCSB) framework, with the goal of facilitating performance comparisons of the new generation of cloud data serving systems. We define a core set of benchmarks and report results for four widely used systems: Cassandra, HBase, Yahoo!'s PNUTS, and a simple sharded MySQL implementation. We also hope to foster the development of additional cloud benchmark suites that represent other classes of applications by making our benchmark tool available via open source. In this regard, a key feature of the YCSB framework/tool is that it is extensible--it supports easy definition of new workloads, in addition to making it easy to benchmark new systems.},
+booktitle = {Proceedings of the 1st ACM Symposium on Cloud Computing},
+pages = {143–154},
+numpages = {12},
+keywords = {cloud serving database, benchmarking},
+location = {Indianapolis, Indiana, USA},
+series = {SoCC '10}
+}
