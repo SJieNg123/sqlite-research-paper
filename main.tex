@@ -4,6 +4,7 @@
 
 \documentclass[sigconf, nonacm]{acmart}
 \usepackage{multirow}
+\usepackage{graphicx}
 
 %% The following content must be adapted for the final version
 % paper-specific
@@ -381,7 +382,7 @@ Figure~\ref{fig:layout-distribution} visualizes the physical distribution of the
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/01_page_distribution.png}
+\includegraphics[width=1\linewidth]{figures/01_page_distribution.png}
 \caption{Physical distribution of the 92 interior pages under the three evaluated layouts. The default layout (1a) scatters interiors across the entire 102 MB file. VACUUM (1b) does not improve clustering. The type-aware rewriter (1c) clusters all interiors within the first 400 KB of the file.}
 \label{fig:layout-distribution}
 \end{figure}
@@ -455,7 +456,7 @@ The effectiveness of structural prefetching, \texttt{layers\_N}, depends on both
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/13_strategy_firstq_bars.png}
+\includegraphics[width=1.1\linewidth]{figures/13_strategy_firstq_bars.png}
 \caption{First-query latency by strategy and workload, log scale. The cache-dump strategy \texttt{2f\_slru} achieves the lowest first-query latency across all three workloads, ranging from 123 to 128 \textmu s. Targeted strategies achieve reductions of $-22\%$ to $-81\%$ with substantially smaller hotsets.}
 \label{fig:firstq-bars}
 \end{figure}
