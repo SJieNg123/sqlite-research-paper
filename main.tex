@@ -661,7 +661,7 @@ File-tail / recently-ingested data (high baseline) & \texttt{2e\_K10} (interior 
 Uniform random reads & \texttt{2d} (observed interiors) & $-43\%$ (B) & $-31\%$ (B, single); cross-seed $-25\%$ robust \\
 Fast skewed workloads & \texttt{2d} / \texttt{2e\_K10}; avoid \texttt{layers\_5} alone & $-22\%$ to $-26\%$ (A) & $-7\%$ to $-9\%$ (A, single); cross-seed $-25\%$ to $-36\%$ robust \\
 Batch / average-latency sensitive & \texttt{2f\_slru} (cache dump) & $-76\%$ to $-89\%$ & Regresses on A/B; on C, $-19\%$ (warm, single) \\
-Multi-process shared DB & Shared cache (\texttt{MAP\_SHARED}) + background warmer, cadence $\le$ query gap & Cost fixed; benefit scales with process count & A 1 s cadence maintains $\sim$26 \textmu s \\
+Multi-process shared DB & Shared cache (\texttt{MAP\_SHARED}) + background warmer, cadence $\le$ query gap & Cost fixed; benefit scales with process count & 1 second cadence maintains $\sim$26 \textmu s \\
 \bottomrule
 \end{tabular}
 \caption{Practical recommendations for serverless and edge SQLite deployments. End-to-end values are single-instantiation warm-process results; cross-seed robust values from Section~\ref{sec:eval-robustness} are noted where available.}
@@ -672,7 +672,7 @@ Three principles summarize the takeaways. First, the cache-dump strategy (\textt
 
 \section{Discussion and Limitations}\label{sec:discussion}
 
-All experiments run on a single commodity x86 machine with a consumer-grade Gen4 NVMe SSD and a single Linux kernel version. Absolute microsecond latencies depend on the specific hardware and kernel; the cost-accounting methodology and the relative ordering of strategies are portable across platforms that share the same warm-container, cold-data deployment model. In particular, our measurements characterize the local-storage tier that production object-storage architectures interpose as a cache layer (e.g., Cloudflare D1's local-disk caching over R2~\cite{CloudflareD1}); the purely remote tier replaces the OS page cache with VFS-level range requests, changing the mechanism while preserving the dependent-fault-chain structure and multiplying per-fault cost by three to four orders of magnitude. Cross-platform validation on ARM/UFS and FaaS-like runtimes is an immediate next step.
+All experiments run on a single commodity x86 machine with a consumer-grade Gen4 NVMe SSD and a single Linux kernel version. Absolute microsecond latencies depend on the specific hardware and kernel, whereas the cost-accounting methodology and the relative ordering of strategies are portable across platforms that share the same warm-container, cold-data deployment model. In particular, our measurements characterize the local-storage tier that production object-storage architectures interpose as a cache layer (e.g., Cloudflare D1's local-disk caching over R2~\cite{CloudflareD1}); the purely remote tier replaces the OS page cache with VFS-level range requests, changing the mechanism while preserving the dependent-fault-chain structure and multiplying per-fault cost by three to four orders of magnitude. Cross-platform validation on ARM/UFS and FaaS-like runtimes is an immediate next step.
 
 Measurement batches exhibit session-to-session absolute drift of approximately 10\% to 15\%, attributable to SSD internal state and CPU thermal conditions. We monitor this drift using the \texttt{2f\_slru} anchor, whose first-query latency is independent of the workload key distribution, and anchor all cross-strategy comparisons to same-batch baselines; cross-batch absolute comparisons are never made.
 
