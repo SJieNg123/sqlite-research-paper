@@ -5,6 +5,7 @@
 \documentclass[sigconf, nonacm]{acmart}
 \usepackage{multirow}
 \usepackage{graphicx}
+\usepackage{array}
 
 %% The following content must be adapted for the final version
 % paper-specific
@@ -85,7 +86,7 @@ The source code, data, and/or other artifacts have been made available at \url{\
 
 \subsubsection{Serverless SQLite as a Growing Deployment Target}\label{sec:serverless-sqlite}
 
-Serverless computing has become a main model of execution for cloud applications, offering transparent scaling, fine-grained billing, and simplified operational management. An increasing number of serverless workloads are stateful and require access to persistent data stored in embedded databases co-located with function instances. Among embedded databases, SQLite stands out as the world's most widely deployed database engine. Gaffney et al. \cite{Gaffney2022} estimate that over one trillion SQLite databases are in active use and that the engine is embedded in nearly every smartphone, sensor, automobile, and television. The same study identifies edge computing as a key emerging use case for SQLite, where lightweight zero-configuration data management is essential. FaaS platforms such as AWS Lambda, Azure Functions, and Google Cloud Functions allow functions to mount persistent storage or use ephemeral local storage for SQLite databases, making SQLite a natural choice for serverless applications that require function-local state, configuration, and lightweight analytics. In such deployments, SQLite serves as the storage layer that supports serverless functions, and its performance directly impacts the response time of the entire function.
+Serverless computing has become a main model of execution for cloud applications, offering transparent scaling, fine-grained billing, and simplified operational management. An increasing number of serverless workloads are stateful and require access to persistent data stored in embedded databases co-located with function instances. Among embedded databases, SQLite stands out as the world's most widely deployed database engine. Gaffney et al. \cite{Gaffney2022} estimate that over one trillion SQLite databases are in active use and that the engine is embedded in nearly every smartphone, sensor, automobile, and television. The same study identifies edge computing as a key emerging use case for SQLite, where lightweight zero-configuration data management is essential. FaaS platforms such as AWS Lambda, Azure Functions, and Google Cloud Functions allow functions to mount persistent storage or use ephemeral local storage for SQLite databases, making SQLite a natural choice for serverless applications that require function-local state, configuration, and lightweight analytics. In such deployments, SQLite serves as the storage layer that supports serverless functions, and its performance directly impacts the response time of the entire function. Notably, production object-storage architectures interpose exactly this layer as a local cache tier: Cloudflare D1 caches object-stored databases on local disk to absorb query traffic~\cite{CloudflareD1}.
 
 \subsubsection{The Warm Container, Cold Data Phenomenon}\label{sec:warm-container}
 
@@ -98,6 +99,8 @@ The histogram-based optimization proposed by Shahrad et al. \cite{Shahrad2020} i
 Du et al. \cite{Du2020} further demonstrate this trend with Catalyzer, achieving sub-millisecond function startup through checkpoint/restore and a new OS primitive called sfork. While their work validates state reuse as a powerful technique for reducing container-level cold starts, it does not address the OS page cache. The file-backed pages cached during one invocation are not preserved from checkpoint, so even with sub-millisecond container startup, the first database query after a cold cache still incurs disk I/O. The better container-level cold-start optimization becomes, the more the remaining bottleneck resides in the data path.
 
 This is the problem we address. On our reference SQLite database, the first query under a cold OS page cache takes 529 to 1096 \textmu s, compared to 1 to 3 \textmu s when the cache is warm, a 200$\times$ to 1000$\times$ slowdown. This places the storage-layer cold-start penalty in the same latency regime as container startup itself (sub-millisecond), meaning that even with optimal container-level warming, the data path remains a first-order bottleneck.
+
+The stakes rise further in object-storage-backed deployments. The root-to-interior-to-leaf fault chain is serial and dependent: each fault must complete before the next page address is known. On local NVMe each link costs microseconds; when SQLite is served from object storage via HTTP range requests~\cite{SqliteWebVfs, Turbolite}, each link becomes a multi-millisecond GET, amplifying the same chain by three to four orders of magnitude. Our measurements quantify this chain at the local-storage tier; the structure of the penalty, and the cost-accounting methodology for attacking it, carry over.
 
 \subsection{Challenges and Problem Statement}\label{sec:challenges}
 
@@ -185,6 +188,8 @@ As established in Section~\ref{sec:warm-container}, the serverless cold-start pr
 
 A separate line of work has addressed serverless cold starts at the container level. Du et al. \cite{Du2020} propose Catalyzer, achieving sub-millisecond function startup through checkpoint/restore and a new OS primitive called sfork (sandbox fork). Their work demonstrates that state reuse is a powerful technique for reducing startup latency, and Catalyzer has been adopted by Ant Financial in production, providing strong evidence that container-level state reuse is a practically validated direction. However, Catalyzer addresses the compute layer; it does not preserve the OS page cache across invocations. The file-backed pages cached during one invocation are not restored from checkpoint, so even with sub-millisecond container startup, the first database query after a cold cache still incurs disk I/O. Our work is complementary: we address the storage-layer cold start that persists after container-level optimizations have done their work, with the additional advantage of operating entirely at the application layer without kernel modifications.
 
+At the storage layer, a growing ecosystem serves SQLite at scale in serverless environments, from per-tenant edge databases~\cite{CloudflareD1} to functions querying object-stored databases through a custom VFS that translates each page I/O into an HTTP range GET~\cite{SqliteWebVfs, Litestream, SqlJsHttpvfs, Turbolite}; in this ecosystem, cold start is the headline metric~\cite{Turbolite}. Most relevant to our work is the \texttt{.dbi} helper of \texttt{sqlite\_web\_vfs}~\cite{SqliteWebVfs}: it collects navigation-critical pages (B-tree interiors and metadata tables) into a compact side file that the VFS prefetches, avoiding scattered reads from the main database. This validates interior-skeleton prefetching in production, and differs from our work in three ways. First, \texttt{.dbi} is a separate sidecar file for a read-only HTTP VFS, whereas our framework operates on the local OS page cache without introducing additional files and supports read-write workloads. Second, no published cost accounting of the prefetch itself exists for the \texttt{.dbi} approach, which is precisely the gap our framework addresses. Third, \texttt{.dbi} selection stops at page types, while our access-frequency lever, which Section~\ref{sec:eval-attribution} shows unlocks the largest gains on narrow workloads, has no counterpart. The mechanisms occupy different storage tiers (OS page cache versus VFS-over-HTTP), but the cost-accounting methodology and dual-lever selection principle transfer.
+
 \section{SQLite Cold-Start Fundamentals}\label{sec:fundamentals}
 
 \subsection{B+tree Storage and Page Types}\label{sec:btree}
@@ -207,7 +212,7 @@ This design reflects three modeling choices that are deliberate rather than comp
 
 Table~\ref{tab:measurement-model} summarizes the state of each software layer at measurement time:
 
-\begin{table}[htbp]
+\begin{table*}[htbp]
 \centering
 \begin{tabular}{lp{0.28\linewidth}p{0.28\linewidth}}
 \toprule
@@ -222,7 +227,7 @@ CPU caches / TLB & Warm (harness code has run) & Processor state preserved acros
 \end{tabular}
 \caption{Measurement state across system layers, contrasted with the serverless wake-up state.}
 \label{tab:measurement-model}
-\end{table}
+\end{table*}
 
 The warm CPU cache bias is estimated at 1 to 3 \textmu s, well below 1\% of the cold baseline (529 to 1096 \textmu s). The operational protocol that realizes this model—cache clearing, residency verification, and cell rejection criteria—is detailed in Section~\ref{sec:methodology}. This section has established the structural and measurement foundations; we now turn to the cost-accounting framework that quantifies the prefetch trade-off (Section~\ref{sec:methodology}).
 
@@ -270,7 +275,9 @@ The \texttt{madvise(MADV\_WILLNEED)} hint is asynchronous and does not guarantee
 
 \begin{table}[htbp]
 \centering
-\begin{tabular}{lp{0.28\linewidth}p{0.28\linewidth}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.2\linewidth}
+                >{\raggedright\arraybackslash}p{0.30\linewidth}
+                >{\raggedright\arraybackslash}p{0.35\linewidth}}
 \toprule
 \textbf{Mode} & \textbf{Behavior} & \textbf{Measures} \\
 \midrule
@@ -344,9 +351,9 @@ We organize the strategy space around two independent selection levers. The firs
 
 Table~\ref{tab:strategies} defines the strategies we evaluate, grouped by their primary selection lever. The hotset sizes are measured on our reference 102 MB database.
 
-\begin{table}[htbp]
+\begin{table*}[htbp]
 \centering
-\begin{tabular}{l p{0.20\linewidth} p{0.30\linewidth} r}
+\begin{tabular}{l p{0.20\linewidth} p{0.40\linewidth} r}
 \toprule
 \textbf{Strategy} & \textbf{Lever} & \textbf{Selection logic} & \textbf{Hotset size} \\
 \midrule
@@ -360,7 +367,7 @@ Table~\ref{tab:strategies} defines the strategies we evaluate, grouped by their 
 \end{tabular}
 \caption{Prefetch strategies evaluated in this study. We refer to each strategy by its short identifier throughout the paper.}
 \label{tab:strategies}
-\end{table}
+\end{table*}
 
 The page-type lever encompasses the \texttt{layers\_N} family, the range and per-page variants (\texttt{2a} and \texttt{2b}), and the interior component of \texttt{2d}. A critical clarification is that ``first $N$ interiors by file offset'' equates to ``the top $N$ levels of the B+tree'' only when the database layout is type-aware, that is, when all interior pages are physically clustered at the file head. Under the default SQLite layout (1a), where interiors and leaves are interleaved, \texttt{layers\_N} simply prefetches the earliest $N$ interior pages in the file, which may bear no relation to tree depth. This distinction explains the workload-dependent behavior we quantify in Section~\ref{sec:evaluation}. The \texttt{2d} strategy improves on \texttt{layers\_N} by prefetching only the interior pages that are actually resident after a workload warmup, determined via \texttt{mincore}. For workload C, for example, \texttt{2d} prefetches only 4 interior pages rather than all 92, as the query stream touches a narrow prefix of the B+tree. Note that \texttt{2d} uses residency observation to \emph{filter} the interior set to those actually used; it does not rank pages by frequency. The frequency lever enters only through the leaf component of \texttt{2e\_K}.
 
@@ -387,7 +394,7 @@ Figure~\ref{fig:layout-distribution} visualizes the physical distribution of the
 \label{fig:layout-distribution}
 \end{figure}
 
-It is important to be precise about the role of \texttt{1c} in our framework. Clustering interior pages at the file head is a double-edged sword. The benefit is that it enables structural prefetch strategies, such as \texttt{layers\_N}, to cover the critical interior set with a single range hint. The cost is that relocating interiors to the file head pushes leaf pages to higher offsets, which raises the no-prefetch baseline for workloads that are dominated by cold leaf faults. In our A/B/C workload matrix, the best end-to-end performance consistently occurs with the default layout (\texttt{1a}) combined with access-pattern prefetching (\texttt{2d} or \texttt{2e\_K}); \texttt{1c} does not outperform \texttt{1a} in any measured cell. The type-aware layout is therefore a negative result under our workloads, useful only in the narrow scenario where prefetching will definitely be deployed, structural targeting is the only available mechanism (for example, when no access-pattern observation is possible), and the workload is sufficiently skewed that the interior prefetch gain outweighs the leaf-offset penalty. We provide the full per-cell comparison and the precise net-win conditions in Section~\ref{sec:evaluation}. This honest assessment aligns with the framing in Section~\ref{sec:contribution}, where we introduced the layout rewriter as a design alternative we evaluated and found to be negative, rather than as a recommended deployment default.
+It is important to be precise about the role of \texttt{1c} in our framework. Clustering interior pages at the file head is a double-edged sword. The benefit is that it enables structural prefetch strategies, such as \texttt{layers\_N}, to cover the critical interior set with a single range hint. The cost is that relocating interiors to the file head pushes leaf pages to higher offsets, which raises the no-prefetch baseline for workloads that are dominated by cold leaf faults. (A production system, \texttt{sqlite\_web\_vfs}'s \texttt{.dbi} side file~\cite{SqliteWebVfs}, sidesteps this displacement by copying navigation-critical pages rather than reordering them in place; we return to this in Section~\ref{sec:eval-attribution}.) In our A/B/C workload matrix, the best end-to-end performance consistently occurs with the default layout (\texttt{1a}) combined with access-pattern prefetching (\texttt{2d} or \texttt{2e\_K}); \texttt{1c} does not outperform \texttt{1a} in any measured cell. The type-aware layout is therefore a negative result under our workloads, useful only in the narrow scenario where prefetching will definitely be deployed, structural targeting is the only available mechanism (for example, when no access-pattern observation is possible), and the workload is sufficiently skewed that the interior prefetch gain outweighs the leaf-offset penalty. We provide the full per-cell comparison and the precise net-win conditions in Section~\ref{sec:evaluation}. This honest assessment aligns with the framing in Section~\ref{sec:contribution}, where we introduced the layout rewriter as a design alternative we evaluated and found to be negative, rather than as a recommended deployment default.
 
 \subsection{Deployment Integration}\label{sec:deployment}
 
@@ -454,12 +461,12 @@ C (file-tail) & $-38\%$ & \texttt{2e\_K10}: $-81\%$; \texttt{2f\_slru}: $-89\%$ 
 
 The effectiveness of structural prefetching, \texttt{layers\_N}, depends on both the workload and the physical layout. On workload A, prefetching the first five interior pages reaches a plateau at approximately $-22\%$ to $-26\%$ first-query reduction; additional interior pages beyond $N=5$ provide no further benefit. Workload B exhibits the same pattern: $N=5$ is already sufficient, and the plateau sits at approximately $-43\%$. Workload C, in contrast, requires nearly all 92 interior pages ($N \approx 92$): \texttt{layers\_N} selects interiors by file offset, while the interiors covering C's file-tail keys sit mid-file, so offset-order selection misses them until $N$ spans nearly the full set. Prefetching only a single interior page ($N=1$) is counter-productive on workload A: the \texttt{madvise} dispatch overhead exceeds the coverage benefit, making first-query latency approximately $+31\%$ worse than the same-batch baseline; on workloads B and C, $N=1$ is slightly better than the baseline by a few percent. The mechanism behind the \texttt{layers\_N} plateau is subtle. At first-query time, both interior and leaf pages are equally cold; prefetching interior pages removes interior faults but leaves the first leaf fault intact. After the query stream warms up, the hot leaves corresponding to frequently accessed keys become naturally resident in the cache. The interior pages, however, remain the only shared bottleneck across all queries. Prefetching the interior skeleton is therefore sufficient for workloads with stable hot keys, while workloads whose first queries strike cold leaves require more: B, with no natural hot set, is served only by the full dump, whereas C's concentrated tail region makes access-frequency targeting effective. The effect of the hot key location, such as low-id hotspots, is secondary; the shape of the N-sweep is consistent across hotspot variants in our artifact.
 
-\begin{figure}[htbp]
+\begin{figure*}[htbp]
 \centering
-\includegraphics[width=1.1\linewidth]{figures/13_strategy_firstq_bars.png}
-\caption{First-query latency by strategy and workload, log scale. The cache-dump strategy \texttt{2f\_slru} achieves the lowest first-query latency across all three workloads, ranging from 123 to 128 \textmu s. Targeted strategies achieve reductions of $-22\%$ to $-81\%$ with substantially smaller hotsets.}
+\includegraphics[width=\textwidth]{figures/13_strategy_firstq_bars.png}
+\caption{First-query latency by strategy and workload (preprocessing not included), log scale. The cache-dump strategy \texttt{2f\_slru} achieves the lowest first-query latency across all three workloads, ranging from 123 to 128 \textmu s. Targeted strategies achieve reductions of $-22\%$ to $-81\%$ with substantially smaller hotsets.}
 \label{fig:firstq-bars}
-\end{figure}
+\end{figure*}
 
 Figure~\ref{fig:firstq-bars} visualizes the first-query latency across strategies and workloads. The cache-dump strategy \texttt{2f\_slru} is the clear leader in the first-query race, delivering 123 to 128 \textmu s across the three workloads, compared to baselines of 529 to 1096 \textmu s. Targeted strategies occupy the middle ground, with \texttt{2e\_K10} on workload C achieving 211 \textmu s ($-81\%$). The figure establishes the first-query rankings that Section~\ref{sec:eval-tradeoff} will revisit with end-to-end latency accounting.
 
@@ -514,12 +521,13 @@ The table reveals a counter-intuitive but consistent pattern. The strategy that 
 In contrast, the frugal targeted strategies, \texttt{2d} and \texttt{2e\_K10}, improve end-to-end latency in the warm-process model across all three workloads. The single-workload wins of \texttt{layers\_5} do not survive cross-seed validation: it is \textit{tie} on A, \textit{directional} on B (toward regression; 
 Section~\ref{sec:eval-robustness}), and on C it is robustly worse ($+5\%$). The headline result is \texttt{2e\_K10} on workload C, which reduces end-to-end latency from 1096 to 291 \textmu s, a $-73\%$ improvement that survives 10-seed validation as $-70\%$ (95\% CI $[-72, -69]$). A single-instantiation estimate would report $-73\%$; the cross-seed correction refines this to $-70\%$ with a tight confidence interval. The deployment model determines the viability of prefetching: in the standalone model, the cold open cost consumes the benefit for fast workloads, but in the warm-process model, the same strategies deliver consistent end-to-end wins. The cold open cost is a common-mode constant that shifts both deployment models' zero points; algebraically, $\text{e2e}_{\text{std}} - (\text{baseline}+t_{\text{open}}) = \text{e2e}_{\text{warm}} - \text{baseline}$, so $t_{\text{open}}$ never determines the within-model verdict.
 
-\begin{figure}[htbp]
+\begin{figure*}[htbp]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/14_strategy_endtoend_stacked.png}
-\caption{End-to-end cold-start latency across the two deployment models. The stacked bars show $\text{e2e}_{\text{standalone}}$ (full bar) and $\text{e2e}_{\text{warm}}$ (bar without the gray open segment). Green labels indicate warm-process improvements; red labels indicate warm-process regressions. The $\ddagger$ marker on A and B \texttt{layers\_5} indicates that the single-instantiation win is not cross-seed robust (cross-seed CI crosses zero); unmarked improvements are cross-seed robust by the criteria of Section~\ref{sec:stats}.}
+\includegraphics[width=\textwidth]{figures/14_strategy_endtoend_stacked.png}
+\caption{End-to-end cold-start latency across the two deployment models. Each bar stacks first-query latency (solid), prefetch deliver cost (yellow hatched), and the cold open(db) (grey cross-hatched); the full bar is $\text{e2e}_{\text{standalone}}$ and the bar without the grey segment is $\text{e2e}_{\text{warm}}$ (the cold open an integrated deployment avoids). Green labels are warm-process improvements over the same-workload baseline (leftmost bar); red labels are regressions. The A and B layers\_5 improvements are single-instantiation only and not cross-seed robust (Table~\ref{tab:e2e-ac}, \ref{sec:stats}).}
+
 \label{fig:e2e-stacked}
-\end{figure}
+\end{figure*}
 
 Figure~\ref{fig:e2e-stacked} visualizes this trade-off. The stacked bars show the two deployment models: the full bar height is $\text{e2e}_{\text{standalone}}$, and removing the gray open segment yields $\text{e2e}_{\text{warm}}$. The gray segment is the cold open cost that an integrated deployment avoids. On workloads A and B, \texttt{2f\_slru} is far above the baseline red line, regressing by $+1248\%$ (A) and $+843\%$ (B) in the warm-process model. In contrast, the targeted strategies in the warm-process model sit below the baseline line for all three workloads, with improvements of $-7\%$ to $-9\%$ on A, $-29\%$ to $-34\%$ on B, and $-73\%$ on C. The $\ddagger$-marked \texttt{layers\_5} wins on A and B are not cross-seed robust, consistent with the verdicts in Table~\ref{tab:e2e-ac}.
 
@@ -591,7 +599,8 @@ Table~\ref{tab:competitive} shows the e2e warm results for a representative subs
 
 The broader lesson is that \texttt{2e\_K10} is never beaten by any tuned dump. Its victory comes primarily from a small footprint combined with frequency ranking, where page-type and pure-frequency approaches are roughly equivalent. The incremental value of page-type awareness emerges only in the narrow workload C, where it guarantees path coverage across all seeds. This is the precise mechanism: page-type knowledge ensures the interior skeleton; frequency ranking selects the right leaves; together they dominate.
 
-We now return to the physical layout rewriter (\texttt{1c}) introduced in Section~\ref{sec:layout}. Our evaluation finds no scenario in which \texttt{1c} outperforms the default layout (\texttt{1a}) when combined with access-pattern prefetching. The best warm e2e on each workload is achieved with \texttt{1a} plus access-pattern targeting: A 481 \textmu s vs \texttt{1c} 525 \textmu s, B 504 \textmu s vs \texttt{1c} 693 \textmu s, C 290 \textmu s vs \texttt{1c} 334 \textmu s. The type-aware layout produces larger percentage improvements for structural prefetching (on A, \texttt{layers\_92} first-query goes from $-60\%$ to $-69\%$), but this is an artifact: the pread first-query floor under \texttt{1c} is 212 \textmu s versus 210 \textmu s under \texttt{1a}; the larger percentage stems entirely from a raised baseline (529 to 695 \textmu s, $+31\%$), not from a lower absolute latency. Clustering interiors at the file head pushes leaves to higher offsets, raising the cold-leaf-fault baseline; the absolute benefit of interior prefetching does not improve. The narrow conditions under which \texttt{1c} could be net-positive, (i) prefetching is definitely deployed, (ii) only structural prefetching is available (no access-pattern observation), and (iii) the workload is sufficiently skewed, are not simultaneously met in any of our A/B/C cells. We therefore recommend the default layout (\texttt{1a}) for production use, and treat \texttt{1c} as a negative result under our evaluated workloads.
+We now return to the physical layout rewriter (\texttt{1c}) introduced in Section~\ref{sec:layout}. Our evaluation finds no scenario in which \texttt{1c} outperforms the default layout (\texttt{1a}) when combined with access-pattern prefetching. The best warm e2e on each workload is achieved with \texttt{1a} plus access-pattern targeting: A 481 \textmu s vs \texttt{1c} 525 \textmu s, B 504 \textmu s vs \texttt{1c} 693 \textmu s, C 290 \textmu s vs \texttt{1c} 334 \textmu s. The type-aware layout produces larger percentage improvements for structural prefetching (on A, \texttt{layers\_92} first-query goes from $-60\%$ to $-69\%$), but this is an artifact: the pread first-query floor under \texttt{1c} is 212 \textmu s versus 210 \textmu s under \texttt{1a}; the larger percentage stems entirely from a raised baseline (529 to 695 \textmu s, $+31\%$), not from a lower absolute latency. Clustering interiors at the file head pushes leaves to higher offsets, raising the cold-leaf-fault baseline; the absolute benefit of interior prefetching does not improve. Notably, a production system arrives at the same conclusion from the 
+opposite direction: the \texttt{.dbi} side file (Section~\ref{sec:layout}) avoids in-place reordering entirely, sidestepping precisely the displacement penalty we quantify here. The narrow conditions under which \texttt{1c} could be net-positive, (i) prefetching is definitely deployed, (ii) only structural prefetching is available (no access-pattern observation), and (iii) the workload is sufficiently skewed, are not simultaneously met in any of our A/B/C cells. We therefore recommend the default layout (\texttt{1a}) for production use, and treat \texttt{1c} as a negative result under our evaluated workloads.
 
 \subsection{Robustness}\label{sec:eval-robustness}
 
@@ -627,7 +636,7 @@ The methodological lesson from the 10-seed sweep is that single-workload point e
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/16_ram_pressure_sweep.png}
+\includegraphics[width=1\linewidth]{figures/16_ram_pressure_sweep.png}
 \caption{RAM pressure under cgroup \texttt{MemoryMax}. Targeted strategies (hotsets $\le$2 MB) maintain 100\% delivery and flat first-query latency across all caps. The cache-dump strategy (\texttt{2f\_slru}) loses delivery linearly and collapses to baseline latency once delivery drops below 100\%.}
 \label{fig:ram}
 \end{figure}
@@ -663,7 +672,7 @@ Three principles summarize the takeaways. First, the cache-dump strategy (\textt
 
 \section{Discussion and Limitations}\label{sec:discussion}
 
-All experiments run on a single commodity x86 machine with a consumer-grade Gen4 NVMe SSD and a single Linux kernel version. Absolute microsecond latencies depend on the specific hardware and kernel; the cost-accounting methodology and the relative ordering of strategies are portable across platforms that share the same warm-container, cold-data deployment model. Cross-platform validation on ARM/UFS and FaaS-like runtimes is an immediate next step.
+All experiments run on a single commodity x86 machine with a consumer-grade Gen4 NVMe SSD and a single Linux kernel version. Absolute microsecond latencies depend on the specific hardware and kernel; the cost-accounting methodology and the relative ordering of strategies are portable across platforms that share the same warm-container, cold-data deployment model. In particular, our measurements characterize the local-storage tier that production object-storage architectures interpose as a cache layer (e.g., Cloudflare D1's local-disk caching over R2~\cite{CloudflareD1}); the purely remote tier replaces the OS page cache with VFS-level range requests, changing the mechanism while preserving the dependent-fault-chain structure and multiplying per-fault cost by three to four orders of magnitude. Cross-platform validation on ARM/UFS and FaaS-like runtimes is an immediate next step.
 
 Measurement batches exhibit session-to-session absolute drift of approximately 10\% to 15\%, attributable to SSD internal state and CPU thermal conditions. We monitor this drift using the \texttt{2f\_slru} anchor, whose first-query latency is independent of the workload key distribution, and anchor all cross-strategy comparisons to same-batch baselines; cross-batch absolute comparisons are never made.
 
@@ -679,7 +688,7 @@ Serverless functions backed by SQLite experience a persistent cold-start bottlen
 
 This work is the first to quantify the first-query versus end-to-end trade-off in SQLite-backed serverless cold starts at OS-syscall granularity. The framework is non-intrusive, operating entirely at the application layer with standard OS interfaces, and is deployable in production FaaS and edge environments.
 
-For future work, the page-type knowledge that drives our selection lever can be pushed below the file abstraction: NVMe Stream Directives or ZNS can physically segregate interior and leaf pages at the SSD level, achieving type-aware placement without the leaf-displacement penalty that made file-level reordering a negative result, and preventing garbage collection from perturbing layout over time. A continuous prefetch direction, maintaining hot-set residency across invocations, would extend our cold-start framework to steady-state scenarios, but this would move the design point from low-frequency, no-root application-layer operation to the high-frequency, kernel-level regime occupied by Leis et al. \cite{Leis2023}, and would require re-evaluating the deployment model accordingly. More broadly, we argue that cost accounting, not first-query latency alone, should be the evaluation standard for cold-start prefetching.
+For future work, the page-type knowledge that drives our selection lever can be pushed below the file abstraction: NVMe Stream Directives or ZNS can physically segregate interior and leaf pages at the SSD level, achieving type-aware placement without the leaf-displacement penalty that made file-level reordering a negative result, and preventing garbage collection from perturbing layout over time. In the object-storage regime, the same dual-lever selection maps to a VFS-level question: which pages to coalesce into a single range request, and whether to issue background read-ahead. At millisecond per-fault costs, the trade-offs we quantify become correspondingly larger. A continuous prefetch direction, maintaining hot-set residency across invocations, would extend our cold-start framework to steady-state scenarios, but this would move the design point from low-frequency, no-root application-layer operation to the high-frequency, kernel-level regime occupied by Leis et al. \cite{Leis2023}, and would require re-evaluating the deployment model accordingly. More broadly, we argue that cost accounting, not first-query latency alone, should be the evaluation standard for cold-start prefetching.
 
 %\clearpage
 
