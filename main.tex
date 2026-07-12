@@ -590,12 +590,12 @@ The corrected ablation and competitive-baseline experiments run as a single same
 \label{tab:ablation}
 \end{table}
 
-Figure~\ref{fig:ablation} visualizes the corrected ablation across workloads. On workload C, the interior lever (\texttt{2d}) carries the robust gain and the leaf-frequency lever collapses to a tie once first-op leakage is removed. On workload B, which has no natural hot set, \texttt{leaf\_freq\_K10} and \texttt{leaf\_rand\_K10} are both near zero; the entire improvement comes from the page-type lever (\texttt{2d}, approximately $-36\%$ first-query, cross-seed mean). Workload A is the one case where the frequency lever contributes genuine signal: the page-type lever provides the base ($-37\%$ first-query from \texttt{2d}), and frequency-selected leaves add a modest, robust bonus beyond it (end-to-end $-25\%$ from \texttt{2d} to $-36\%$ from \texttt{2e\_K10}), consistent with A's Zipfian access pattern where some leaves are genuinely hot.
+Figure~\ref{fig:ablation} visualizes the corrected same-batch ablation on \emph{C\_mixed}. The interior lever (\texttt{2d}) carries the robust gain ($-43\%$ first-query, $-36\%$ warm e2e); the leaf-frequency lever collapses to a tie ($-3\%$ warm e2e, CI crossing zero) once first-op leakage is removed; and the random-leaf control is net-slower ($+7\%$ warm e2e). The other workloads are characterized by the 10-seed cross-seed sweep (Section~\ref{sec:eval-robustness}), not a separate ablation: on the uniform workload B the entire warm-process gain is the interior skeleton (\texttt{2d} $\approx -25\%$ cross-seed), and on the skewed workload A the frequency lever adds a genuine, robust bonus beyond the skeleton (warm e2e $\approx -25\%$ from \texttt{2d} to $\approx -36\%$ from \texttt{2e\_K10}), consistent with A's Zipfian access pattern where some leaves are genuinely hot.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/17_lever_ablation.png}
-\caption{Ablation of selection levers on workload C. The \texttt{leaf\_rand\_K10} control isolates the effect of frequency ranking: same page count and type as \texttt{leaf\_freq\_K10}, differing only in selection criterion. Results are 10-seed means with 95\% bootstrap CIs for first-query.}
+\caption{Corrected same-batch ablation of selection levers on \emph{C\_mixed} (orig layout only; single source \texttt{results/ablation\_comp\_v2}). Both panels---first-query and warm-process e2e $\Delta\%$ versus the same-batch baseline---are 10-seed means with 95\% bootstrap CIs. The \texttt{leaf\_rand\_K10} control isolates frequency ranking (same page count and type as \texttt{leaf\_freq\_K10}, differing only in selection criterion). Interior page-type (\texttt{2d}) is the robust lever; leaf-frequency alone is a tie on warm e2e once first-op leakage is removed.}
 \label{fig:ablation}
 \end{figure}
 
