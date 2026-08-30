@@ -6,6 +6,7 @@
 \usepackage{multirow}
 \usepackage{graphicx}
 \usepackage{array}
+\usepackage{amssymb}
 
 %% The following content must be adapted for the final version
 % paper-specific
@@ -190,14 +191,27 @@ A separate line of work has addressed serverless cold starts at the container le
 
 At the storage layer, a growing ecosystem serves SQLite at scale in serverless environments, from per-tenant edge databases~\cite{CloudflareD1} to functions querying object-stored databases through a custom VFS that translates each page I/O into an HTTP range GET~\cite{SqliteWebVfs, Litestream, SqlJsHttpvfs, Turbolite}; in this ecosystem, cold start is the headline metric~\cite{Turbolite}. Most relevant to our work is the \texttt{.dbi} helper of \texttt{sqlite\_web\_vfs}~\cite{SqliteWebVfs}: it collects navigation-critical pages (B-tree interiors and metadata tables) into a compact side file that the VFS prefetches, avoiding scattered reads from the main database. This validates interior-skeleton prefetching in production, and differs from our work in three ways. First, \texttt{.dbi} is a separate sidecar file for a read-only HTTP VFS, whereas our framework operates on the local OS page cache without introducing additional files and supports read-write workloads. Second, no published cost accounting of the prefetch itself exists for the \texttt{.dbi} approach, which is precisely the gap our framework addresses. Third, \texttt{.dbi} selection stops at page types, matching our robust interior-skeleton lever; we additionally evaluate an access-frequency leaf lever, which Section~\ref{sec:eval-attribution} shows adds value only under a verified concentrated hotspot. The mechanisms occupy different storage tiers (OS page cache versus VFS-over-HTTP), but the cost-accounting methodology and the skeleton-first selection principle transfer.
 
-Figure~\ref{fig:capability} summarizes the positioning of this work against the prior art surveyed in this section across three dimensions: whether the approach has structural visibility into the B+tree (interior-page and access-frequency awareness), whether it accounts for prefetch preprocessing on the critical path, and whether it deploys non-intrusively without source modifications.
+Table~\ref{tab:capability} summarizes the positioning of this work against the prior art surveyed in this section across three dimensions: whether the approach has structural visibility into the B+tree (interior-page and access-frequency awareness), whether it accounts for prefetch preprocessing on the critical path, and whether it deploys non-intrusively without source modifications.
 
-\begin{figure}[htbp]
+\begin{table}[htbp]
 \centering
-\includegraphics[width=1\linewidth]{figures/18_capability_matrix.png}
-\caption{Positioning of this work against prior art. Our framework is the only approach that simultaneously provides structural targeting, critical-path cost accounting, and non-intrusive deployment.}
-\label{fig:capability}
-\end{figure}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}l ccc@{}}
+\toprule
+\textbf{Approach} & \shortstack{\textbf{Structural}\\\textbf{targeting}} & \shortstack{\textbf{Cost}\\\textbf{accounting}} & \shortstack{\textbf{Non-intrusive}\\\textbf{deployment}} \\
+\midrule
+OS readahead~\cite{Smith1978,Iyer2001} & $\times$ & $\times$ & $\checkmark$ \\
+libprefetch~\cite{VanDeBogart2009} & $\checkmark$ & $\times$ & $\times$ \\
+Learned prefetch~\cite{Chen2021,Yi2026} & ($\checkmark$) & $\times$ & $\times$ \\
+\texttt{.dbi} web VFS~\cite{SqliteWebVfs} & ($\checkmark$) & $\times$ & $\checkmark$ \\
+\midrule
+\textbf{Our work} & $\checkmark$ & $\checkmark$ & $\checkmark$ \\
+\bottomrule
+\end{tabular}
+\caption{Positioning of this work against prior art across the three capabilities an ideal serverless cold-start prefetcher must provide simultaneously ($\checkmark$ full, ($\checkmark$) partial, $\times$ absent). Structural targeting is B+tree page-type / access-frequency awareness; cost accounting is counting open and deliver preprocessing in the end-to-end critical path; non-intrusive deployment requires no SQLite, kernel, or FTL source modification. Every prior approach misses at least one capability, and the critical-path \emph{cost-accounting} column is absent for all of them---the gap this paper fills. Our framework is the only approach that simultaneously provides all three.}
+\label{tab:capability}
+\end{table}
 
 \section{SQLite Cold-Start Fundamentals}\label{sec:fundamentals}
 
