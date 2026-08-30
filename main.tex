@@ -376,9 +376,9 @@ Table~\ref{tab:strategies} defines the strategies we evaluate, grouped by their 
 
 \begin{table*}[htbp]
 \centering
-\begin{tabular}{l l p{0.18\linewidth} p{0.36\linewidth} r}
+\begin{tabular}{p{0.1\linewidth} p{0.12\linewidth} p{0.45\linewidth} p{0.20\linewidth}}
 \toprule
-\textbf{Strategy} & \textbf{Codename} & \textbf{Lever} & \textbf{Selection logic} & \textbf{Hotset size} \\
+\textbf{Strategy} & \textbf{Lever} & \textbf{Selection logic} & \textbf{Hotset size} \\
 \midrule
 \texttt{Skel-N} & Page-type & First $N$ interior pages by file offset ($N$ swept; $N=5$ and $N=92$ reported as representatives) & $N \times 4$ KB \\
 \texttt{Skel-all-range} & Page-type & All 92 interiors, coalesced into range hints & 368 KB \\
