@@ -443,7 +443,7 @@ Mixed-Mutation Churn & Write-heavy mutation schedule (\emph{not} a measured work
 
 Scattered-Zipf, Uniform-100K, and Tail-Mixed are designed to represent three distinct access characteristics: skew (Scattered-Zipf), uniformity (Uniform-100K), and mixed tail-boundary lookups (Tail-Mixed). Scattered-Zipf follows the access-distribution profile of YCSB-C~\cite{Cooper2010} (read-only Zipfian, $\alpha = 0.99$), with a key permutation that scatters hot keys across the 100{,}000-key active domain, analogous to YCSB's scrambled Zipfian; our generator reproduces the distribution rather than YCSB's exact sampling implementation. Both Scattered-Zipf and Uniform-100K follow the YCSB op-string format (\texttt{read <key>}, \texttt{update <key>}, \texttt{scan <key> <len>})\footnote{\url{https://github.com/ls4154/YCSB-cpp}}. Tail-Mixed and Mixed-Mutation Churn are custom designs specific to this study; they have no YCSB equivalent. Scattered-Zipf and Uniform-100K draw keys from a 100,000-key active domain (ids 1 through 100,000), which lies entirely within the database's 600,000-key extent. Tail-Mixed instead draws uniformly over a 20,000-key interval (ids 590,000 through 609,999) that crosses the database maximum id of 600,000, so roughly half of its lookups fall beyond the maximum and become not-found probes. Each read workload executes 100,000 operations.
 
-Three auxiliary robustness workloads support specific controls, all on the original layout (\texttt{1a}) only. Tail-Hit is a matched pure-hit control that draws the same-size tail range entirely within the existing key space (zero not-found), and it isolates the not-found effect in the attribution analysis of Section~\ref{sec:eval-attribution}. Latest-Aging (read-latest) and Short-Scan Aging (short-ranges) are deterministic Python reconstructions of the YCSB-D and YCSB-E core semantics rather than official YCSB traces, and they drive the static-plan staleness experiment of Section~\ref{sec:eval-robustness}: Latest-Aging's read hotspot moves over time (non-stationary), whereas Short-Scan Aging's is stationary. Neither Tail-Hit nor Latest-Aging/Short-Scan Aging alters the Scattered-Zipf/Uniform-100K/Tail-Mixed first-query baselines.
+Three auxiliary robustness workloads support specific controls, all on the original layout (\texttt{1a}) only. Tail-Hit is a matched pure-hit control that draws the same-size tail range entirely within the existing key space (zero not-found), and it isolates the not-found effect in the attribution analysis of Section~\ref{sec:eval-attribution}. Latest-Aging (read-latest) and Short-Scan Aging (short-ranges) are deterministic Python reconstructions of the YCSB-D and YCSB-E core semantics rather than official YCSB traces, and they drive the static-plan staleness experiment of Section~\ref{sec:eval-robustness}: Latest-Aging's read hotspot moves over time (non-stationary), whereas Short-Scan Aging's is stationary. Neither Tail-Hit nor Latest-Aging/Short-Scan Aging alters the Scattered-Zipf/Uniform-100K/Tail-Mixed first-query baselines. Hashed-Hotspot is a native YCSB hotspot read workload (hot-data-fraction $1\%$) whose hot keys are hashed across the physical key space, so the hot leaves are scattered rather than contiguous; it is used only in the cross-platform portability analysis of Section~\ref{sec:eval-portability} and is not equated with Tail-Mixed.
 
 The three read workloads each produce the cold first-query baselines reported throughout this paper: under the default layout (\texttt{1a}), the median cold first-query latencies are 523~\textmu s for Scattered-Zipf, 749~\textmu s for Uniform-100K, and 1087~\textmu s for Tail-Mixed. These baseline values are used as the denominator for all improvement calculations in Section~\ref{sec:evaluation}. The original workload traces are published with our artifact (checksummed); the accompanying generator reproduces their distributions and drives the 10-seed sensitivity analysis of Section~\ref{sec:stats}.
 
@@ -676,6 +676,93 @@ The methodological lesson from the 10-seed sweep is that single-workload point e
 \textbf{Cadence and MAP\_SHARED.} With \texttt{mmap(MAP\_SHARED)}, a single prefetch operation benefits all processes sharing the same OS page cache. A background warmer re-warms the hotset at a configurable cadence. At cadence values of 1 s and 5 s, first-query latency is maintained at 26 \textmu s and 29 \textmu s, respectively; at 30 s or never, it regresses to 281--305 \textmu s, near the no-prefetch baseline. The cadence is a trade-off parameter: reducing cadence maintains warmth at the cost of additional I/O and CPU overhead; increasing cadence saves resources but allows the cache to cool. There is no single best cadence; the operator selects a point on the frontier based on the workload's query interval.
 
 \textbf{Database size scaling.} We scale the reference database by $10\times$ to $\sim$1 GiB (6 million rows, 263,991 pages) and rerun the experiment on a separate batch. The first-query improvement is size-robust: across the 18 (workload $\times$ strategy) cells, all cells show the same direction of improvement as on 102 MB, and all 1 GiB cells are robust (CI excludes zero). The warm-process e2e sensitivity is concentrated on Tail-Mixed for dump-style strategies: \texttt{2f\_slru} goes from $-9\%$ on 102 MB to $+139\%$ on 1 GiB, and \texttt{2e\_K500} goes from $-31\%$ to $+35\%$, as the resident working set for Tail-Mixed expands from 483 to 984 pages, doubling the deliver cost. In contrast, the tie-break-unaffected interior skeleton \texttt{2d} remains a robust win on Tail-Mixed at both sizes, and the size story is carried by the deliver-cost trend rather than by any corrected leaf-selector magnitude: the cache-dump deliver trap worsens with database size while frugal skeleton prefetch stays effective. (The pre-fix \texttt{2e\_K10} figures of $-70\%$/$-68\%$ at 102~MB/1~GiB are diagnostic only; the corrected leaf-selector magnitude was not re-validated across sizes.) The corresponding figure is available in our artifact.
+
+\subsection{Cross-Platform Effectiveness Portability}\label{sec:eval-portability}
+
+The results so far were measured on a single workstation harness. To test
+whether the \emph{relative} effectiveness ordering of strategies survives a
+genuine container-based FaaS runtime, we replicated the strategy matrix on an
+Apache OpenWhisk deployment and compared it to the workstation cell-by-cell.
+Effectiveness is the relative first-query reduction against the same-condition
+baseline, $R = (\mathit{fq}_{\text{base}} - \mathit{fq}_{\text{strat}}) /
+\mathit{fq}_{\text{base}}$; only this relative quantity is comparable across
+platforms, and we never compare absolute microseconds between the two. The
+OpenWhisk evidence is accounted \emph{without pooling} across seven immutable
+deployment campaigns (5{,}756 invocations / 2{,}878 A/B pairs); the warm paired
+first-query is a deployment-feasibility and relative-effectiveness signal, not
+an absolute strategy-performance estimate. This validation shares the
+workstation's x86 and NVMe hardware, so it isolates the container-runtime and
+deployment dimension rather than establishing hardware portability. Over the
+strategy$\times$workload cells both platforms ran, coverage is complete: all 65
+of 65 cells (55 first-query cells plus 10 delivery-order \texttt{lp} cells).
+
+We classify each cell's effectiveness as effective ($R \geq 0.10$), harmful
+($R \leq -0.10$), or neutral, and call a workstation cell strongly effective
+when $R_{\text{ws}} \geq 0.30$. We report the per-cell rank correlation over
+three nested subsets: all 55 first-query cells, a high-confidence subset of 46
+(dropping low-sample cells), and a high-confidence \emph{clean} subset of 42
+(also dropping the 4 position-sensitive cells whose baseline-first and
+target-first subsets disagree in sign). Seven of the 55 first-query cells were
+superseded, once and pre-registered, by exactly position-balanced replications;
+the canonical historical table is retained byte-unchanged as the record.
+
+Every strategy that is strongly effective on the workstation remains effective
+under OpenWhisk: 41 of 41 strong-workstation first-query cells
+(Figure~\ref{fig:portability}). The two
+platforms' per-cell effectiveness ranks correlate at Spearman $\rho \approx
+0.76$ over all 55 cells, $0.79$ over the high-confidence 46, and $0.81$ over the
+clean 42. Per-cell effectiveness direction agrees in 46 of 55 cells, and the
+median absolute effectiveness gap is $|\Delta R| \approx 0.11$.
+Table~\ref{tab:portability} breaks the correlation down by workload; the ordering ports on
+every skew regime, and the one weak correlation (Tail-Hit, $\rho \approx 0.25$)
+is the pure-hit control whose cells are all effective on both platforms with
+little rank spread to correlate.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Workload} & \textbf{Cells} & \textbf{Spearman $\rho$} & \textbf{Direction agree} \\
+\midrule
+Scattered-Zipf  & 10 & 0.77 & 9/10  \\
+Uniform-100K    & 10 & 0.87 & 7/10  \\
+Hashed-Hotspot  & 10 & 0.82 & 8/10  \\
+Tail-Mixed      & 14 & 0.70 & 11/14 \\
+Tail-Hit        & 11 & 0.25 & 11/11 \\
+\midrule
+\textbf{All}    & 55 & 0.76 & 46/55 \\
+\bottomrule
+\end{tabular}
+\caption{Per-workload cross-platform effectiveness portability
+(workstation vs.\ OpenWhisk). Spearman $\rho$ is the tie-aware per-cell
+effectiveness-rank correlation; direction-agree counts cells whose
+effective/harmful/neutral classification matches on both platforms. Tail-Hit's
+low $\rho$ reflects a saturated pure-hit control (all cells effective on both
+platforms), not a portability failure.}
+\label{tab:portability}
+\end{table}
+
+The disagreements are few and benign. Nine of the 55 first-query cells differ in
+classification across platforms, and every one is at the neutral margin or in a
+low-sample or position-sensitive cell rather than a strong-workstation failure.
+The single strategy that is harmful under OpenWhisk, \texttt{layers\_5} on
+Hashed-Hotspot ($R_{\text{ws}} \approx +0.03 \to R_{\text{ow}} \approx -0.60$),
+is workstation-neutral to begin with, so it is not a strong strategy that broke.
+Four cells are position-sensitive---their baseline-first and target-first
+subsets disagree in sign---and are reported as balanced-batch descriptive
+estimates that reflect pair-position and short-lived execution-storage state
+rather than a clean per-cell causal effect. Portability across distinct hardware
+and to commercial FaaS providers remains future work.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/19_openwhisk_effectiveness_bars.png}
+\caption{Per-cell workstation vs.\ OpenWhisk effectiveness ($R$) across the
+covered strategy$\times$workload cells. Every strongly-effective workstation
+strategy (leftmost group) remains effective under OpenWhisk; disagreements
+cluster at the neutral margin.}
+\label{fig:portability}
+\end{figure}
 
 \subsection{Practical Guidance}\label{sec:eval-guidance}
 
