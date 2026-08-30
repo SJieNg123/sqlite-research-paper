@@ -203,13 +203,13 @@ Table~\ref{tab:capability} summarizes the positioning of this work against the p
 \midrule
 OS readahead~\cite{Smith1978,Iyer2001} & $\times$ & $\times$ & $\checkmark$ \\
 libprefetch~\cite{VanDeBogart2009} & $\checkmark$ & $\times$ & $\times$ \\
-Learned prefetch~\cite{Chen2021,Yi2026} & ($\checkmark$) & $\times$ & $\times$ \\
-\texttt{.dbi} web VFS~\cite{SqliteWebVfs} & ($\checkmark$) & $\times$ & $\checkmark$ \\
+Learned prefetch~\cite{Chen2021,Yi2026} & $\checkmark$* & $\times$ & $\times$ \\
+\texttt{.dbi} web VFS~\cite{SqliteWebVfs} & $\checkmark$* & $\times$ & $\checkmark$ \\
 \midrule
 \textbf{Our work} & $\checkmark$ & $\checkmark$ & $\checkmark$ \\
 \bottomrule
 \end{tabular}
-\caption{Positioning of this work against prior art across the three capabilities an ideal serverless cold-start prefetcher must provide simultaneously ($\checkmark$ full, ($\checkmark$) partial, $\times$ absent). Structural targeting is B+tree page-type / access-frequency awareness; cost accounting is counting open and deliver preprocessing in the end-to-end critical path; non-intrusive deployment requires no SQLite, kernel, or FTL source modification. Every prior approach misses at least one capability, and the critical-path \emph{cost-accounting} column is absent for all of them---the gap this paper fills. Our framework is the only approach that simultaneously provides all three.}
+\caption{Positioning of this work against prior art across the three capabilities an ideal serverless cold-start prefetcher must provide simultaneously ($\checkmark$ full, $\checkmark$* partial, $\times$ absent). Structural targeting is B+tree page-type / access-frequency awareness; cost accounting is counting open and deliver preprocessing in the end-to-end critical path; non-intrusive deployment requires no SQLite, kernel, or FTL source modification. Every prior approach misses at least one capability, and the critical-path \emph{cost-accounting} column is absent for all of them---the gap this paper fills. Our framework is the only approach that simultaneously provides all three.}
 \label{tab:capability}
 \end{table}
 
@@ -376,9 +376,9 @@ Table~\ref{tab:strategies} defines the strategies we evaluate, grouped by their 
 
 \begin{table*}[htbp]
 \centering
-\begin{tabular}{p{0.1\linewidth} p{0.1\linewidth} p{0.45\linewidth} p{0.20\linewidth}}
+\begin{tabular}{l l p{0.18\linewidth} p{0.36\linewidth} r}
 \toprule
-\textbf{Strategy} & \textbf{Lever} & \textbf{Selection logic} & \textbf{Hotset size} \\
+\textbf{Strategy} & \textbf{Codename} & \textbf{Lever} & \textbf{Selection logic} & \textbf{Hotset size} \\
 \midrule
 \texttt{Skel-N} & Page-type & First $N$ interior pages by file offset ($N$ swept; $N=5$ and $N=92$ reported as representatives) & $N \times 4$ KB \\
 \texttt{Skel-all-range} & Page-type & All 92 interiors, coalesced into range hints & 368 KB \\
@@ -441,7 +441,7 @@ We evaluate three measured read workloads that cover orthogonal dimensions of ac
 
 \begin{table}[htbp]
 \centering
-\begin{tabular}{p{0.2\linewidth} p{0.35\linewidth} p{0.35\linewidth}}
+\begin{tabular}{lp{0.35\linewidth}p{0.35\linewidth}}
 \toprule
 \textbf{Workload} & \textbf{Access pattern} & \textbf{Serverless scenario} \\
 \midrule
