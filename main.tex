@@ -374,6 +374,21 @@ We organize the strategy space around two independent selection levers. The firs
 
 Table~\ref{tab:strategies} defines the strategies we evaluate, grouped by their primary selection lever. The hotset sizes are measured on our reference 102 MB database.
 
+% ---------------------------------------------------------------------------
+% Strategy naming: paper short-name (rendered) <-> internal codename (source only,
+% NOT rendered; codenames are the identifiers used in the released artifact/data).
+%   Skel-N          = layers_N   (Skel-5 = layers_5, Skel-92 = layers_92)
+%   Skel-all-range  = 2a
+%   Skel-all-page   = 2b
+%   Skel            = 2d
+%   Skel+K          = 2e_K       (Skel+10 = 2e_K10, Skel+500 = 2e_K500)
+%   Dump            = 2f_slru
+%   Dump-N          = 2f_topN    (Dump-14 = 2f_top14, Dump-28 = 2f_top28)
+%   Default / Vacuum / Clustered = 1a / 1b / 1c        (layouts)
+%   LP-sorted / LP-shuf          = lp_sorted / lp_shuf (libprefetch delivery order)
+%   learned-Markov               = learned_markov      (Chen-lineage baseline)
+%   *-static                     = frozen delivery plan
+% ---------------------------------------------------------------------------
 \begin{table*}[htbp]
 \centering
 \begin{tabular}{p{0.1\linewidth} p{0.12\linewidth} p{0.45\linewidth} p{0.20\linewidth}}
@@ -388,7 +403,7 @@ Table~\ref{tab:strategies} defines the strategies we evaluate, grouped by their 
 \texttt{Dump} & None (cache dump) & Full resident working set after workload warmup & $\sim$17.7 MB (Scattered-Zipf/Uniform-100K; $\sim$1.8 MB for Tail-Mixed) \\
 \bottomrule
 \end{tabular}
-\caption{Prefetch strategies evaluated in this study. We refer to each strategy by its short descriptive name throughout the paper; the internal identifiers used in our released artifact and data files are, in row order, \texttt{layers\_N}, \texttt{2a}, \texttt{2b}, \texttt{2d}, \texttt{2e\_K}, and \texttt{2f\_slru}. Swept variants append the parameter to the family name (e.g., \texttt{Skel+10}/\texttt{Skel+500} for \texttt{2e\_K10}/\texttt{2e\_K500}; \texttt{Dump-14}/\texttt{Dump-N} for \texttt{2f\_top14}/\texttt{2f\_topN}), and \texttt{-static} marks a frozen delivery plan. The three physical layouts (Section~\ref{sec:layout}) are \texttt{Default}/\texttt{Vacuum}/\texttt{Clustered} (codenames \texttt{1a}/\texttt{1b}/\texttt{1c}); the prior-art delivery-order arms are \texttt{LP-sorted}/\texttt{LP-shuf} (codenames \texttt{lp\_sorted}/\texttt{lp\_shuf}).}
+\caption{Prefetch strategies evaluated in this study. We refer to each strategy by its short descriptive name throughout the paper. Swept variants append the parameter to the family name (\texttt{Skel+10} and \texttt{Skel+500} extend \texttt{Skel+K}; \texttt{Dump-14} and \texttt{Dump-N} extend \texttt{Dump}), and the \texttt{-static} suffix marks a frozen delivery plan. The three physical layouts (Section~\ref{sec:layout}) are \texttt{Default}, \texttt{Vacuum}, and \texttt{Clustered}; the prior-art delivery-order arms are \texttt{LP-sorted} and \texttt{LP-shuf}.}
 \label{tab:strategies}
 \end{table*}
 
