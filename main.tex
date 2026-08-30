@@ -376,19 +376,19 @@ Table~\ref{tab:strategies} defines the strategies we evaluate, grouped by their 
 
 \begin{table*}[htbp]
 \centering
-\begin{tabular}{l l p{0.18\linewidth} p{0.36\linewidth} r}
+\begin{tabular}{p{0.12\linewidth} p{0.14\linewidth} p{0.45\linewidth} p{0.20\linewidth}}
 \toprule
-\textbf{Strategy} & \textbf{Codename} & \textbf{Lever} & \textbf{Selection logic} & \textbf{Hotset size} \\
+\textbf{Strategy} & \textbf{Lever} & \textbf{Selection logic} & \textbf{Hotset size} \\
 \midrule
-\texttt{Skel-N} & \texttt{layers\_N} & Page-type & First $N$ interior pages by file offset ($N$ swept; $N=5$ and $N=92$ reported as representatives) & $N \times 4$ KB \\
-\texttt{Skel-all-range} & \texttt{2a} & Page-type & All 92 interiors, coalesced into range hints & 368 KB \\
-\texttt{Skel-all-page} & \texttt{2b} & Page-type & All 92 interiors, one hint per page & 368 KB \\
-\texttt{Skel} & \texttt{2d} & Page-type (observed) & Resident interiors after workload warmup; observed, not ranked by frequency & 16--72 KB \\
-\texttt{Skel+K} & \texttt{2e\_K} & Both levers & \texttt{Skel} + top-$K$ most frequently accessed leaves ($K$ swept) & $\sim$112 KB for $K=10$; $\sim$2 MB for $K=500$ \\
-\texttt{Dump} & \texttt{2f\_slru} & None (cache dump) & Full resident working set after workload warmup & $\sim$17.7 MB (Scattered-Zipf/Uniform-100K; $\sim$1.8 MB for Tail-Mixed) \\
+\texttt{Skel-N} & Page-type & First $N$ interior pages by file offset ($N$ swept; $N=5$ and $N=92$ reported as representatives) & $N \times 4$ KB \\
+\texttt{Skel-all-range} & Page-type & All 92 interiors, coalesced into range hints & 368 KB \\
+\texttt{Skel-all-page} & Page-type & All 92 interiors, one hint per page & 368 KB \\
+\texttt{Skel} & Page-type (observed) & Resident interiors after workload warmup; observed, not ranked by frequency & 16--72 KB \\
+\texttt{Skel+K} & Both levers & \texttt{Skel} + top-$K$ most frequently accessed leaves ($K$ swept) & $\sim$112 KB for $K=10$; $\sim$2 MB for $K=500$ \\
+\texttt{Dump} & None (cache dump) & Full resident working set after workload warmup & $\sim$17.7 MB (Scattered-Zipf/Uniform-100K; $\sim$1.8 MB for Tail-Mixed) \\
 \bottomrule
 \end{tabular}
-\caption{Prefetch strategies evaluated in this study. We refer to each strategy by its short descriptive name throughout the paper; the \emph{Codename} column gives the internal identifier used in our released artifact and data files. Swept variants append the parameter to the family name (e.g., \texttt{Skel+10}/\texttt{Skel+500} for \texttt{2e\_K10}/\texttt{2e\_K500}; \texttt{Dump-14}/\texttt{Dump-N} for \texttt{2f\_top14}/\texttt{2f\_topN}), and \texttt{-static} marks a frozen delivery plan. The three physical layouts (Section~\ref{sec:layout}) are \texttt{Default}/\texttt{Vacuum}/\texttt{Clustered} (codenames \texttt{1a}/\texttt{1b}/\texttt{1c}); the prior-art delivery-order arms are \texttt{LP-sorted}/\texttt{LP-shuf} (codenames \texttt{lp\_sorted}/\texttt{lp\_shuf}).}
+\caption{Prefetch strategies evaluated in this study. We refer to each strategy by its short descriptive name throughout the paper; the internal identifiers used in our released artifact and data files are, in row order, \texttt{layers\_N}, \texttt{2a}, \texttt{2b}, \texttt{2d}, \texttt{2e\_K}, and \texttt{2f\_slru}. Swept variants append the parameter to the family name (e.g., \texttt{Skel+10}/\texttt{Skel+500} for \texttt{2e\_K10}/\texttt{2e\_K500}; \texttt{Dump-14}/\texttt{Dump-N} for \texttt{2f\_top14}/\texttt{2f\_topN}), and \texttt{-static} marks a frozen delivery plan. The three physical layouts (Section~\ref{sec:layout}) are \texttt{Default}/\texttt{Vacuum}/\texttt{Clustered} (codenames \texttt{1a}/\texttt{1b}/\texttt{1c}); the prior-art delivery-order arms are \texttt{LP-sorted}/\texttt{LP-shuf} (codenames \texttt{lp\_sorted}/\texttt{lp\_shuf}).}
 \label{tab:strategies}
 \end{table*}
 
