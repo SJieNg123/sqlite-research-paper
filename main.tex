@@ -124,7 +124,7 @@ This paper presents a frugal, non-intrusive SQLite prefetch framework for server
 
 \textbf{Contribution 3: Non-intrusive, deployment-compatible toolchain.} Our framework operates entirely at the application layer using only standard POSIX interfaces (\texttt{mmap}, \texttt{mincore}, \texttt{madvise}). It requires no modification to SQLite, the OS kernel, the FTL, or the serverless runtime, and does not require privileged access or root permissions. These properties make the framework compatible with the execution restrictions of production FaaS environments without requiring platform modification or privileged access. [\textit{Addresses Challenge 3: Deployability.}]
 
-\textbf{Rigorous empirical validation.} We validate our framework across six robustness axes: write churn that perturbs page layout (50k mutations across 11 checkpoints), sub-working-set RAM pressure that triggers page reclaim, multi-process cache sharing with cadence-based re-warm, workload instantiation with 10 independent random seeds and bootstrap 95\% confidence intervals, database scaling by a factor of 10 (102 MB to approximately 1 GiB), and static-plan staleness under a moving read hotspot. We further establish cross-platform effectiveness portability to a genuine FaaS runtime (Apache OpenWhisk, all 65 covered workstation cells). This multi-dimensional validation ensures that our headline results are not artifacts of a single workload sample, deployment platform, or a particular hardware configuration.
+\textbf{Rigorous empirical validation.} We validate our framework across six robustness axes: write churn that perturbs page layout (50k mutations across 11 checkpoints), sub-working-set RAM pressure that triggers page reclaim, multi-process cache sharing with cadence-based re-warm, workload instantiation with 10 independent random seeds and bootstrap 95\% confidence intervals, database scaling by a factor of 10 (102 MB to approximately 1 GiB), and static-plan staleness under a moving read hotspot. We further establish cross-platform effectiveness portability to a genuine FaaS runtime: on Apache OpenWhisk every strongly-effective workstation strategy remains effective (41 of 41 first-query cells) across all 65 covered cells, with per-cell effectiveness ranks correlating at Spearman $\rho\approx0.76$ to $0.81$. This multi-dimensional validation ensures that our headline results are not artifacts of a single workload sample, deployment platform, or a particular hardware configuration.
 
 Our results reveal a counter-intuitive but robust finding. The strategy that minimizes first-query latency the most, a cache-dump approach that reloads the entire resident working set, regresses end-to-end performance by roughly an order of magnitude on the broad-working-set workloads Scattered-Zipf and Uniform-100K, where its deliver overhead of 0.8 to 7 ms dominates the response time; the narrow small-working-set workload Tail-Mixed is the exception. In contrast, a frugal prefetch of the interior navigation skeleton, with an aggregate footprint under 2 MB, delivers consistent, statistically robust warm-process end-to-end improvements across the evaluated pure-hit workloads, and a small hotspot-conditional leaf budget adds incremental value only where a workload is genuinely skewed. This work is, to the best of our knowledge, the first to separate open, delivery, and first-query terms and align them with integrated and standalone deployment boundaries in SQLite-backed serverless cold starts, with an application-layer design that operates within the execution constraints of restricted FaaS environments without privileged platform changes.
 
@@ -447,6 +447,35 @@ Three auxiliary robustness workloads support specific controls, all on the origi
 
 The three read workloads each produce the cold first-query baselines reported throughout this paper: under the default layout (\texttt{1a}), the median cold first-query latencies are 523~\textmu s for Scattered-Zipf, 749~\textmu s for Uniform-100K, and 1087~\textmu s for Tail-Mixed. These baseline values are used as the denominator for all improvement calculations in Section~\ref{sec:evaluation}. The original workload traces are published with our artifact (checksummed); the accompanying generator reproduces their distributions and drives the 10-seed sensitivity analysis of Section~\ref{sec:stats}.
 
+\subsection{OpenWhisk Portability Deployment}\label{sec:setup-openwhisk}
+
+The cross-platform portability analysis (Section~\ref{sec:eval-portability})
+runs the same prefetch toolchain inside a genuine container-based FaaS runtime,
+Apache OpenWhisk, on the same bare-metal host described above; no hardware or
+kernel changes are introduced, so the deployment isolates the container-runtime
+and deployment dimension rather than a new hardware configuration. The action
+loads an identical bound reference database---the original-layout (\texttt{1a})
+\texttt{test.db} of 26{,}331 pages---and issues prefetch hints through the same
+non-privileged application-layer interfaces (\texttt{mmap}, \texttt{madvise})
+used on the workstation (Contribution~3); nothing in the container requires
+kernel, FTL, or runtime modification.
+
+Each measured invocation is one arm of an A/B pair: a same-condition baseline
+arm and a strategy arm, scheduled under a block-union paired design with
+position balancing. We report the warm paired first-query, which is a
+deployment-feasibility and relative-effectiveness signal rather than an absolute
+strategy-performance estimate; absolute microseconds are never compared between
+OpenWhisk and the workstation. The comparison quantity is the relative
+first-query reduction $R$ defined in Section~\ref{sec:eval-portability}.
+
+The OpenWhisk evidence accumulates over seven immutable, additively-frozen
+deployment campaigns totalling 5{,}756 invocations (2{,}878 A/B pairs). The
+campaigns answer distinct coverage questions and are accounted \emph{without
+pooling}: the totals are bookkeeping across the seven frozen campaigns, never a
+single pooled effect estimate. Together they give complete coverage of the
+strategy$\times$workload cells the workstation ran---65 of 65 (55 first-query
+cells plus 10 delivery-order \texttt{lp} cells).
+
 \section{Evaluation}\label{sec:evaluation}
 
 \subsection{First-Query Gains and Workload-Dependent Ceilings}\label{sec:eval-fq}
@@ -627,6 +656,12 @@ Table~\ref{tab:competitive} shows the e2e warm results for a representative subs
 
 The broader lesson is that \texttt{2e\_K10} ties, but does not beat, a footprint-matched frequency-ranked dump across all three workloads. What matters is a small footprint combined with sound page selection; explicit page typing and pure frequency ranking recover a similar page set. Page-type awareness earns its place as an \emph{interpretable} mechanism that \emph{guarantees} interior-skeleton coverage independent of the observed access sample, rather than as a technique that uniquely outperforms frequency ranking.
 
+Two prior-art arms cited in Section~\ref{sec:related} remain, each isolating a dimension the competitive baselines above hold fixed.
+
+\textbf{Delivery order (libprefetch).} The competitive baselines above vary the prefetch \emph{set} at a fixed delivery order; the core contribution of libprefetch~\cite{VanDeBogart2009} is the opposite, varying delivery \emph{order} (C-LOOK offset sorting) at a fixed set. We reproduce it as an ordering-only comparison: two arms deliver the identical $\sim$18\,MB working set (whose sorted-order page set is identical to \texttt{2f\_slru}), one in ascending file-offset order (\texttt{lp\_sorted}), one shuffled (\texttt{lp\_shuf}). On NVMe the ordering penalty survives only in the deliver term: synchronous \texttt{pread} delivery is $10$ to $16\times$ slower shuffled than sorted ($15.6\times$ Scattered-Zipf, $15.1\times$ Uniform-100K, $10.5\times$ Tail-Mixed), hundreds of milliseconds of avoidable serialized transfer. First-query latency is essentially unchanged between the two orderings (a warm control: both arms deliver the same pages); the entire ordering effect falls in the deliver term, orders of magnitude larger than any first-query difference. The penalty is specific to synchronous \texttt{pread}, which serializes the transfer; asynchronous \texttt{fadvise} dispatch, which only hands the kernel a hint, shows no ordering effect (deliver ratio $\approx 1.0$ on all three workloads). Without a block-level trace we make no device-mechanism claim beyond this synchronous/asynchronous split. libprefetch is thus orthogonal to our set-selection contribution: a delivery-scheduling optimization whose only NVMe residue is a deliver-term cost that leaves first-query latency untouched.
+
+\textbf{Learned page-transition prefetching (Chen lineage).} The second arm is a learned prefetcher in the lineage of Chen et al.~\cite{Chen2021}: a first-order Markov page-transition model that computes finite-horizon expected page visits from the B$^+$tree root and prefetches the top-$N$. We evaluate it under leave-one-seed-out (LOSO) cross-validation across the 10 workload seeds (train on nine, test on the held-out seed) so no test trace informs its own prefetch set. At matched footprint it reduces cold first-query latency by $-39.6\%$ (Scattered-Zipf), $-36.6\%$ (Uniform-100K), and $-65.4\%$ (Tail-Mixed), a $-37\%$ to $-69\%$ range across cells with every 95\% CI excluding zero, at $100\%$ delivery on verified-cold caches. It ties footprint-matched frequency ranking and targeted prefetch on Uniform-100K and Tail-Mixed (overlapping CIs) but is worse on Scattered-Zipf ($-40\%$ versus $-51\%$ for same-budget frequency-ranked and hot-leaf arms): the learned transition model does not beat plain frequency ranking where the access distribution is broad, and matches it where the distribution is concentrated. (An earlier single-fold analysis reported a more optimistic held-out figure; the honest LOSO mean supersedes it.) These two arms therefore reinforce the broader lesson: neither delivery-order scheduling nor a learned transition model outperforms a small, soundly-selected prefetch set.
+
 We now return to the physical layout rewriter (\texttt{1c}) introduced in Section~\ref{sec:layout}. Our evaluation finds no scenario in which \texttt{1c} outperforms the default layout (\texttt{1a}) when combined with access-pattern prefetching. The best warm e2e on each workload is achieved with \texttt{1a} plus access-pattern targeting: Scattered-Zipf 452 \textmu s vs \texttt{1c} 523 \textmu s, Uniform-100K 509 \textmu s vs \texttt{1c} 701 \textmu s, and (from the tie-break-corrected batch) Tail-Mixed \texttt{2e\_K10} 265 \textmu s vs \texttt{1c} 317 \textmu s. Each orig-vs-\texttt{1c} pair is same-batch; the Tail-Mixed pair uses the corrected \texttt{tiebreak\_fix} values (orig $-75\%$, \texttt{1c} $-63\%$). The type-aware layout produces slightly larger percentage improvements for structural prefetching (on Scattered-Zipf, \texttt{layers\_92} first-query goes from $-30\%$ to $-32\%$), but this is an artifact: the pread first-query floor under \texttt{1c} is 187 \textmu s versus 187 \textmu s under \texttt{1a}; the larger percentage stems entirely from a raised baseline (523 to 658 \textmu s, $+26\%$), not from a lower absolute latency. Clustering interiors at the file head pushes leaves to higher offsets, raising the cold-leaf-fault baseline; the absolute benefit of interior prefetching does not improve. Notably, a production system arrives at the same conclusion from the
 opposite direction: the \texttt{.dbi} side file (Section~\ref{sec:layout}) avoids in-place reordering entirely, sidestepping precisely the displacement penalty we quantify here. The narrow conditions under which \texttt{1c} could be net-positive, (i) prefetching is definitely deployed, (ii) only structural prefetching is available (no access-pattern observation), and (iii) the workload is sufficiently skewed, are not simultaneously met in any of our Scattered-Zipf/Uniform-100K/Tail-Mixed cells. We therefore recommend the default layout (\texttt{1a}) for production use, and treat \texttt{1c} as a negative result under our evaluated workloads.
 
@@ -682,7 +717,8 @@ The methodological lesson from the 10-seed sweep is that single-workload point e
 The results so far were measured on a single workstation harness. To test
 whether the \emph{relative} effectiveness ordering of strategies survives a
 genuine container-based FaaS runtime, we replicated the strategy matrix on an
-Apache OpenWhisk deployment and compared it to the workstation cell-by-cell.
+Apache OpenWhisk deployment (Section~\ref{sec:setup-openwhisk}) and compared it
+to the workstation cell-by-cell.
 Effectiveness is the relative first-query reduction against the same-condition
 baseline, $R = (\mathit{fq}_{\text{base}} - \mathit{fq}_{\text{strat}}) /
 \mathit{fq}_{\text{base}}$; only this relative quantity is comparable across
