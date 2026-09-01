@@ -52,7 +52,7 @@
 \begin{abstract}
 Serverless functions backed by SQLite face a persistent cold-start bottleneck: after idle periods the OS page cache is evicted, making the first query orders of magnitude slower than subsequent ones. Existing prefetching techniques optimize the post-prefetch first-query latency, implicitly assuming that improvement translates to a faster end-to-end cold start. We show that this assumption can mis-rank strategies, because the prefetch preprocessing itself sits on the user-visible critical path. Our primary contribution is a critical-path cost-accounting methodology: we decompose cold-start latency into a cold file open, per-page delivery, and the first query, evaluate it under two deployment boundaries (an integrated warm-process model that reuses an already-open handle and a standalone external-warmer model that pays the cold open), and separate page selection from page delivery. All operations use standard OS interfaces and require no modification to SQLite.
 
-Once preprocessing is charged, the design rule that emerges is frugal coverage. A small set that covers the B+tree interior navigation path (footprint under 2 MB) yields a robust $25$ to $30\%$ warm-process end-to-end reduction across the evaluated pure-hit workloads. Hot-leaf prefetching is a conditional add-on that helps only under an independently verified concentrated hotspot, raising Scattered-Zipf from about $-25\%$ with interior coverage alone to about $-36\%$ under genuine Zipfian skew. At matched footprint, a frequency-ranked dump is statistically indistinguishable from the type-aware selector, so structural page-type knowledge earns its place as an interpretable coverage guarantee rather than a uniquely faster selector. The counterexample that motivates the metric is the full-working-set cache dump: it minimizes first-query latency ($-79\%$ to $-91\%$) yet regresses broad-workload end-to-end cold starts by about an order of magnitude, because its 0.8 to 7 ms delivery cost dominates the response, with the narrow small-working-set workload Tail-Mixed the sole exception. A mixed tail-boundary workload whose key range is roughly half not-found high-key lookups produces a larger but narrowly scoped, bimodal result driven by a rightmost-leaf hotspot. A matched pure-hit control returns to the $\approx-27\%$ to $-30\%$ coverage regime, and static frequency plans decay when the read hotspot moves whereas structural coverage remains stable. Finally, the relative effectiveness ordering is preserved on a genuine FaaS runtime: on a separate-host Apache OpenWhisk deployment, every strategy strongly effective on the workstation remains effective (41 of 41 first-query cells) and per-cell effectiveness ranks correlate at Spearman $\rho\approx0.76$ to $0.81$, a bounded relative-effectiveness result, not an absolute or hardware-portability claim. To our knowledge, this is the first SQLite OS-page-cache cold-start evaluation to separate open, delivery, and first-query terms and align them with integrated and standalone deployment boundaries.
+Once preprocessing is charged, the design rule that emerges is frugal coverage. A small set that covers the B+tree interior navigation path (footprint under 2 MB) yields a robust $25$ to $30\%$ warm-process end-to-end reduction across the evaluated pure-hit workloads. Hot-leaf prefetching is a conditional add-on that helps only under an independently verified concentrated hotspot, raising Scattered-Zipf from about $-25\%$ with interior coverage alone to about $-36\%$ under genuine Zipfian skew. At matched footprint, a frequency-ranked dump is statistically indistinguishable from the type-aware selector, so structural page-type knowledge earns its place as an interpretable coverage guarantee rather than a uniquely faster selector. The counterexample that motivates the metric is the full-working-set cache dump: it minimizes first-query latency ($-79\%$ to $-91\%$) yet regresses broad-workload end-to-end cold starts by about an order of magnitude, because its 0.8 to 7 ms delivery cost dominates the response, with the narrow small-working-set workload Tail-Mixed the sole exception. A mixed tail-boundary workload whose key range is roughly half not-found high-key lookups produces a larger but narrowly scoped, bimodal result driven by a rightmost-leaf hotspot. A matched pure-hit control returns to the $\approx-27\%$ to $-30\%$ coverage regime, and static frequency plans decay when the read hotspot moves whereas structural coverage remains stable. Finally, the first-query effectiveness signal remains broadly consistent on a genuine FaaS runtime: on a separate-host Apache OpenWhisk deployment, all 41 workstation cells with strong first-query effectiveness remain effective, and per-cell first-query effectiveness ranks correlate at Spearman $\rho\approx0.76$ to $0.81$. This is a first-query portability result, not a cross-platform end-to-end or hardware-portability claim. To our knowledge, this is the first SQLite OS-page-cache cold-start evaluation to separate open, delivery, and first-query terms and align them with integrated and standalone deployment boundaries.
 \end{abstract}
 
 \maketitle
@@ -125,9 +125,9 @@ This paper presents a frugal, non-intrusive SQLite prefetch framework for server
 
 \textbf{Contribution 2: An evidence-backed frugal-coverage design rule.} Charging preprocessing reverses the naive ranking: the strategy that best minimizes first-query latency, a full-working-set cache dump, regresses broad-workload end-to-end cold starts by about an order of magnitude because delivery cost dominates. The robust operating point is instead a small-footprint set that covers the B+tree interior navigation path, which yields roughly $25$ to $30\%$ warm-process end-to-end reduction across the evaluated pure-hit workloads with a footprint under 2 MB. We are candid about what the structural lever does and does not buy: at matched footprint, a frequency-ranked dump is statistically indistinguishable from the type-aware selector, and a corrected ablation (whose estimator we fix with a trace-order-independent tie-break, Section~\ref{sec:eval-attribution}) further shows that leaf-frequency selection alone is essentially a tie and that random leaves can slow end-to-end latency. Structural page-type knowledge therefore earns its place not as a uniquely faster selector but as an interpretable, structurally grounded way to \emph{guarantee} navigation-path coverage: the structural criterion (interior versus leaf) is workload-independent and does not spend a leaf budget while the navigation path is still cold, even though the concrete observed-interior set it selects may remain workload-specific. Adding hot leaves is an \emph{incremental} optimization that pays off only under an independently verified concentrated hotspot. We also evaluate a physical layout rewriter that clusters interior pages at the file head and find it a negative result under our workloads.
 
-\textbf{Contribution 3: A deployment-compatible toolchain and multi-axis empirical validation.} The framework that operationalizes the cost accounting works entirely at the application layer using only standard POSIX interfaces (\texttt{mmap}, \texttt{mincore}, \texttt{madvise}). It requires no modification to SQLite, the OS kernel, the FTL, or the serverless runtime, and no privileged access, making it an enabler for the study rather than a novel artifact in itself. We validate the design rule across six robustness axes: write churn that perturbs page layout (50k mutations across 11 checkpoints), sub-working-set RAM pressure that triggers page reclaim, multi-process cache sharing with cadence-based re-warm, workload instantiation with 10 independent random seeds and bootstrap 95\% confidence intervals, database scaling by a factor of 10 ($\sim$103 MiB to approximately 1 GiB), and static-plan staleness under a moving read hotspot. We also test cross-platform effectiveness portability on a genuine, separate-host Apache OpenWhisk deployment: every strongly-effective workstation strategy remains effective (41 of 41 first-query cells) across all 65 covered cells, with per-cell effectiveness ranks correlating at Spearman $\rho\approx0.76$ to $0.81$. We state this as a bounded relative-effectiveness result, not a claim of commercial-FaaS validation, hardware portability, or an isolated runtime-only effect.
+\textbf{Contribution 3: A deployment-compatible toolchain, workstation robustness validation, and FaaS first-query portability.} The framework that operationalizes the cost accounting works entirely at the application layer using only standard POSIX interfaces (\texttt{mmap}, \texttt{mincore}, \texttt{madvise}). It requires no modification to SQLite, the OS kernel, the FTL, or the serverless runtime, and no privileged access, making it an enabler for the study rather than a novel artifact in itself. We validate the design rule across six robustness axes: write churn that perturbs page layout (50k mutations across 11 checkpoints), sub-working-set RAM pressure that triggers page reclaim, multi-process cache sharing with cadence-based re-warm, workload instantiation with 10 independent random seeds and bootstrap 95\% confidence intervals, database scaling by a factor of 10 ($\sim$103 MiB to approximately 1 GiB), and static-plan staleness under a moving read hotspot. Separately, we test deployability and first-query effectiveness portability on a genuine, separate-host Apache OpenWhisk deployment. The deployment covers all 65 workstation-matched cells, comprising 55 first-query effectiveness cells and 10 libprefetch delivery-order cells. Within the 55-cell first-query domain, all 41 cells that are strongly effective on the workstation remain effective on OpenWhisk, and per-cell first-query effectiveness ranks correlate at Spearman $\rho\approx0.76$ to $0.81$. This validates deployability and first-query effectiveness portability, not the end-to-end design rule, which the workstation robustness axes establish. We state it as a bounded first-query result, not a claim of commercial-FaaS validation, hardware portability, or an isolated runtime-only effect.
 
-\textbf{Scope of evidence.} Our claims fall into three levels. We directly \emph{measure} cold-start latency at the local NVMe / OS-page-cache tier, on a bare-metal workstation and on a separate-host Apache OpenWhisk deployment. We use these measurements to \emph{instantiate} two deployment boundaries (the warm-process/integrated cold-data model and the standalone external-warmer accounting model), which are faithful models of serverless keep-alive behavior rather than traces from a commercial platform. We do \emph{not} directly measure commercial FaaS providers, distinct hardware classes, or the remote object-storage VFS tier. For these we claim only methodological relevance and structural analogy, since the same dependent root-to-leaf fault chain motivates analogous cost accounting at the remote tier, and we leave systematic validation to future work.
+\textbf{Scope of evidence.} We separate what each platform measures. On the bare-metal workstation we directly \emph{measure} the first-query, deliver, and cold-open terms and \emph{instantiate} two deployment boundaries (the warm-process/integrated cold-data model and the standalone external-warmer accounting model), which are faithful models of serverless keep-alive behavior rather than traces from a commercial platform. The workstation is the sole basis for the end-to-end cost accounting and the frugal-coverage design rule. On the separate-host Apache OpenWhisk deployment we directly \emph{measure} deployability and relative first-query effectiveness (with the libprefetch delivery-order cells where applicable), not the end-to-end boundaries. We therefore do \emph{not} establish cross-platform end-to-end ranking portability, absolute-latency portability, hardware portability, or commercial-FaaS generality. We also do \emph{not} directly measure commercial FaaS providers, distinct hardware classes, or the remote object-storage VFS tier. For these we claim only methodological relevance and structural analogy, since the same dependent root-to-leaf fault chain motivates analogous cost accounting at the remote tier, and we leave systematic validation to future work.
 
 The remainder of this paper is organized as follows. Section~\ref{sec:related} surveys related work and positions our contributions. Section~\ref{sec:fundamentals} establishes the SQLite B+tree storage structure and our warm-container, cold-data measurement model. Section~\ref{sec:methodology} presents our end-to-end cost model, selection--delivery decomposition, measurement protocol, and statistical methodology. Section~\ref{sec:strategy} describes the two-lever prefetch strategies (an interior-navigation-coverage lever and a conditional hot-leaf bonus) and the physical layout alternatives we evaluate. Section~\ref{sec:setup} details our experimental platform, reference database, and workloads. Section~\ref{sec:evaluation} reports our experimental results, centered on the first-query versus end-to-end trade-off. Section~\ref{sec:discussion} discusses the scope and limitations of our findings, and Section~\ref{sec:conclusion} concludes with future directions.
 
@@ -481,17 +481,15 @@ strategy-performance estimate. Absolute microseconds are never compared between
 OpenWhisk and the workstation. The comparison quantity is the relative
 first-query reduction $R$ defined in Section~\ref{sec:eval-portability}.
 
-The OpenWhisk evidence accumulates over seven immutable, additively-frozen
-deployment campaigns totalling 5{,}756 invocations (2{,}878 A/B pairs). The
-campaigns answer distinct coverage questions and are accounted \emph{without
-pooling}: the totals are bookkeeping across the seven frozen campaigns, never a
-single pooled effect estimate. Together they give complete coverage of the
-strategy$\times$workload cells the workstation ran, 65 of 65 (55 first-query
-cells plus 10 delivery-order \texttt{LP} cells).
+Seven frozen campaigns comprise 5{,}756 invocations and 2{,}878 A/B pairs. The
+campaign totals are bookkeeping only, and effect estimates are never pooled
+across campaigns. Together the campaigns give complete coverage of the
+strategy$\times$workload cells the workstation ran, 65 of 65: 55 first-query
+effectiveness cells plus 10 delivery-order \texttt{LP} cells.
 
 \section{Evaluation}\label{sec:evaluation}
 
-Our evaluation answers three questions. \textbf{RQ1:} does a lower first-query latency imply a faster cold start? Sections~\ref{sec:eval-fq} and~\ref{sec:eval-tradeoff} show that it does not: once delivery cost is charged, the first-query ranking can reverse. \textbf{RQ2:} given critical-path cost accounting, what should we prefetch? Section~\ref{sec:eval-attribution} shows the answer is a small coverage set: interior-navigation coverage is a robust, interpretable default, hot leaves help only under an independently verified hotspot, and at matched footprint a sophisticated selector shows no demonstrated advantage over a frequency-ranked dump. \textbf{RQ3:} does this conclusion survive workload variation and a real deployment? Sections~\ref{sec:eval-robustness} and~\ref{sec:eval-portability} answer yes, across six robustness axes and a bounded OpenWhisk relative-effectiveness comparison.
+Our evaluation answers three questions. \textbf{RQ1:} does a lower first-query latency imply a faster cold start? Sections~\ref{sec:eval-fq} and~\ref{sec:eval-tradeoff} show that it does not: once delivery cost is charged, the first-query ranking can reverse. \textbf{RQ2:} given critical-path cost accounting, what should we prefetch? Section~\ref{sec:eval-attribution} shows the answer is a small coverage set: interior-navigation coverage is a robust, interpretable default, hot leaves help only under an independently verified hotspot, and at matched footprint a sophisticated selector shows no demonstrated advantage over a frequency-ranked dump. \textbf{RQ3:} are the end-to-end design conclusions robust to workload and system variation, and does the underlying first-query effectiveness survive deployment in a FaaS runtime? Section~\ref{sec:eval-robustness} tests the end-to-end conclusion under workload and system variation on the controlled workstation, across six robustness axes. Section~\ref{sec:eval-portability} asks the narrower deployment question of whether the first-query effectiveness signal survives on Apache OpenWhisk, where all 41 strong-workstation first-query cells remain effective and first-query effectiveness ranks correlate at Spearman $\rho\approx0.76$ to $0.81$.
 
 \subsection{First-Query Gains and Workload-Dependent Ceilings}\label{sec:eval-fq}
 
@@ -727,28 +725,30 @@ The methodological lesson from the 10-seed sweep is that single-workload point e
 
 \textbf{Database size scaling.} We scale the reference database by $10\times$ to $\sim$1 GiB (6 million rows, 263,991 pages) and rerun the experiment on a separate batch. The first-query improvement is size-robust: across the 18 (workload $\times$ strategy) cells, all cells show the same direction of improvement as on $\sim$103 MiB, and all 1 GiB cells are robust (CI excludes zero). The warm-process e2e sensitivity is concentrated on Tail-Mixed for dump-style strategies: \texttt{Dump} goes from $-9\%$ on $\sim$103 MiB to $+139\%$ on 1 GiB, and \texttt{Skel+500} goes from $-31\%$ to $+35\%$, as the resident working set for Tail-Mixed expands from 483 to 984 pages, doubling the deliver cost. In contrast, the tie-break-unaffected interior skeleton \texttt{Skel} remains a robust win on Tail-Mixed at both sizes, and the size story is carried by the deliver-cost trend rather than by any corrected leaf-selector magnitude: the cache-dump deliver trap worsens with database size while frugal skeleton prefetch stays effective. (The pre-fix \texttt{Skel+10} figures of $-70\%$/$-68\%$ at $\sim$103~MiB/1~GiB are diagnostic only. The corrected leaf-selector magnitude was not re-validated across sizes.) The corresponding figure is available in our artifact.
 
-\subsection{Cross-Platform Effectiveness Portability}\label{sec:eval-portability}
+\subsection{Cross-Platform First-Query Effectiveness Portability}\label{sec:eval-portability}
 
-The results so far were measured on a single workstation harness. To test
-whether the \emph{relative} effectiveness ordering of strategies survives a
-genuine container-based FaaS runtime, we replicated the strategy matrix on an
-Apache OpenWhisk deployment (Section~\ref{sec:setup-openwhisk}) and compared it
-to the workstation cell-by-cell.
-Effectiveness is the relative first-query reduction against the same-condition
-baseline, $R = (\mathit{fq}_{\text{base}} - \mathit{fq}_{\text{strat}}) /
-\mathit{fq}_{\text{base}}$. Only this relative quantity is comparable across
-platforms, and we never compare absolute microseconds between the two. The
-OpenWhisk evidence is accounted \emph{without pooling} across seven immutable
-deployment campaigns (5{,}756 invocations / 2{,}878 A/B pairs). As noted in
-Section~\ref{sec:setup-openwhisk}, this fresh-handle paired first-query (a
-per-invocation handle mode, not the external-warmer deployment boundary) is a
-deployment-feasibility and relative-effectiveness signal, not an absolute
-strategy-performance estimate. This validation runs on a separate
-commodity x86 host with its own consumer NVMe and a different kernel. It exercises
-the FaaS runtime together with its host and does not isolate the container-runtime
-dimension or establish hardware portability. Over the
-strategy$\times$workload cells both platforms ran, coverage is complete: all 65
-of 65 cells (55 first-query cells plus 10 delivery-order \texttt{LP} cells).
+The results so far were measured on a single workstation harness. This
+experiment does not re-evaluate the end-to-end cost ordering on OpenWhisk. It
+asks the narrower deployment question of whether the first-query effectiveness of
+the prefetched page sets survives the FaaS runtime and host environment. We
+replicated the strategy matrix on an Apache OpenWhisk deployment
+(Section~\ref{sec:setup-openwhisk}) and compared it to the workstation cell by
+cell, using the frozen non-pooled evidence defined in
+Section~\ref{sec:setup-openwhisk}.
+First-query effectiveness is the relative first-query reduction against the
+same-condition baseline, $R = (\mathit{fq}_{\text{base}} -
+\mathit{fq}_{\text{strat}}) / \mathit{fq}_{\text{base}}$. Only this relative
+quantity is comparable across platforms, and we never compare absolute
+microseconds between the two. As noted in Section~\ref{sec:setup-openwhisk}, this
+fresh-handle paired first-query (a per-invocation handle mode, not the
+external-warmer deployment boundary) is a deployment-feasibility and first-query
+effectiveness signal, not an absolute strategy-performance estimate. This
+validation runs on a separate commodity x86 host with its own consumer NVMe and a
+different kernel. It exercises the FaaS runtime together with its host and does
+not isolate the container-runtime dimension or establish hardware portability.
+Over the strategy$\times$workload cells both platforms ran, coverage is complete:
+all 65 of 65 cells, comprising 55 first-query effectiveness cells plus 10
+delivery-order \texttt{LP} cells.
 
 We classify each cell's effectiveness as effective ($R \geq 0.10$), harmful
 ($R \leq -0.10$), or neutral, and call a workstation cell strongly effective
@@ -756,21 +756,26 @@ when $R_{\text{ws}} \geq 0.30$. We report the per-cell rank correlation over
 three nested subsets: all 55 first-query cells, a high-confidence subset of 46
 (dropping low-sample cells), and a high-confidence \emph{clean} subset of 42
 (also dropping the 4 position-sensitive cells whose baseline-first and
-target-first subsets disagree in sign). Seven of the 55 first-query cells were
-superseded, once and pre-registered, by exactly position-balanced replications.
-The canonical historical table is retained byte-unchanged as the record.
+target-first subsets disagree in sign). Seven of the 55 first-query cells were re-measured with position-balanced
+replications after their initial measurements showed low sample counts or
+pair-position imbalance. The campaigns and the per-cell precedence rule were
+specified before the replication runs. Every OpenWhisk statistic reported in this
+paper uses the revised measurements for those seven cells and the original
+measurements for the remaining 48. The historical values are retained in the
+artifact for provenance.
 
-Every strategy that is strongly effective on the workstation remains effective
-under OpenWhisk: 41 of 41 strong-workstation first-query cells
-(Figure~\ref{fig:portability}). The two
-platforms' per-cell effectiveness ranks correlate at Spearman $\rho \approx
-0.76$ over all 55 cells, $0.79$ over the high-confidence 46, and $0.81$ over the
-clean 42. Per-cell effectiveness direction agrees in 46 of 55 cells, and the
-median absolute effectiveness gap is $|\Delta R| \approx 0.11$.
-Table~\ref{tab:portability} breaks the correlation down by workload. The ordering ports on
-every skew regime, and the one weak correlation (Tail-Hit, $\rho \approx 0.25$)
-is the pure-hit control whose cells are all effective on both platforms with
-little rank spread to correlate.
+Within the 55-cell first-query domain, all 41 cells that are strongly effective
+on the workstation remain effective under OpenWhisk (41 of 41,
+Figure~\ref{fig:portability}). The two platforms' per-cell first-query
+effectiveness ranks show substantial but imperfect agreement, correlating at
+Spearman $\rho \approx 0.76$ over all 55 cells, $0.79$ over the high-confidence
+46, and $0.81$ over the clean 42. Per-cell first-query effectiveness direction
+agrees in 46 of 55 cells, and the median absolute effectiveness gap is $|\Delta
+R| \approx 0.11$. Table~\ref{tab:portability} breaks the correlation down by
+workload. First-query effectiveness ranks agree substantially on every skew
+regime, and the one weak correlation (Tail-Hit, $\rho \approx 0.25$) is the
+pure-hit control whose cells are all effective on both platforms with little rank
+spread to correlate.
 
 \begin{table}[htbp]
 \centering
@@ -787,12 +792,17 @@ Tail-Hit        & 11 & 0.25 & 11/11 \\
 \textbf{All}    & 55 & 0.76 & 46/55 \\
 \bottomrule
 \end{tabular}
-\caption{Per-workload cross-platform effectiveness portability
-(workstation vs.\ OpenWhisk). Spearman $\rho$ is the tie-aware per-cell
-effectiveness-rank correlation. Direction-agree counts cells whose
-effective/harmful/neutral classification matches on both platforms. Tail-Hit's
-low $\rho$ reflects a saturated pure-hit control (all cells effective on both
-platforms), not a portability failure.}
+\caption{Per-workload cross-platform first-query effectiveness portability
+(workstation vs.\ OpenWhisk). Spearman $\rho$ measures agreement in the
+continuous first-query effectiveness ranking ($R$), while direction agreement
+counts cells whose effective/neutral/harmful classification (thresholding $R$ at
+$\pm0.10$) matches on both platforms. High rank correlation can therefore coexist
+with lower classification agreement when cells lie near a classification
+threshold. Uniform-100K illustrates this: despite high rank agreement ($\rho =
+0.87$), three near-boundary cells cross the categorical threshold, reducing
+direction agreement to 7 of 10. Tail-Hit's low $\rho$ reflects a saturated
+pure-hit control (all cells effective on both platforms), not a portability
+failure.}
 \label{tab:portability}
 \end{table}
 
@@ -811,10 +821,11 @@ hardware classes and to commercial FaaS providers remains future work.
 \begin{figure*}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/19_openwhisk_effectiveness_bars.png}
-\caption{Per-cell workstation vs.\ OpenWhisk effectiveness ($R$) across the
-covered strategy$\times$workload cells. Every strongly-effective workstation
-strategy (leftmost group) remains effective under OpenWhisk. Disagreements
-cluster at the neutral margin.}
+\caption{Per-cell workstation vs.\ OpenWhisk first-query effectiveness $R$ across
+the covered strategy$\times$workload cells. Within the 55-cell first-query
+domain, all 41 strong-workstation cells (leftmost groups) remain effective under
+OpenWhisk. Disagreements cluster at the neutral margin. This figure reports
+first-query effectiveness portability only, not end-to-end portability.}
 \label{fig:portability}
 \end{figure*}
 
@@ -844,7 +855,7 @@ Three principles summarize the takeaways. First, the cache-dump strategy (\textt
 
 \section{Discussion and Limitations}\label{sec:discussion}
 
-All experiments run on a single commodity x86 machine with a consumer-grade Gen4 NVMe SSD and a single Linux kernel version. Absolute microsecond latencies depend on the hardware, kernel, and runtime. The cost-accounting methodology is intended to transfer to platforms sharing the same warm-process, cold-data model. Whether the relative ordering of strategies carries over to a genuine FaaS runtime is an empirical question we test directly with an Apache OpenWhisk deployment (Section~\ref{sec:eval-portability}). Across every workstation--OpenWhisk cell we cover (65 of 65), the relative effectiveness ordering is preserved: every strategy that is strongly effective on the workstation (relative first-query reduction $R_{\text{ws}}\ge0.30$) is also effective under OpenWhisk (41 of 41 first-query cells), and the two platforms' per-cell effectiveness ranks correlate at Spearman $\rho\approx0.76$ to $0.81$. This is a relative-effectiveness result, accounted without pooling across seven immutable deployment campaigns. The OpenWhisk fresh-handle paired first-query (a per-invocation handle mode, not the external-warmer deployment boundary of the cost model) is a deployment-feasibility and relative-effectiveness signal, not an absolute strategy-performance estimate. In particular, our measurements characterize the local-storage tier that production object-storage architectures interpose as a cache layer (e.g., Cloudflare D1's local-disk caching over R2~\cite{CloudflareD1}). The purely remote tier replaces the OS page cache with VFS-level range requests, changing the mechanism while preserving the dependent-fault-chain structure and multiplying per-fault cost by three to four orders of magnitude. This FaaS-runtime validation runs on a separate commodity x86 host with its own consumer NVMe and a different Linux kernel, so it exercises the container-based runtime together with its host rather than isolating the runtime dimension or establishing hardware portability. The few per-cell disagreements are confined to strategies neutral on at least one platform and to position-sensitive cells (Section~\ref{sec:eval-portability}). None is a regression of a workstation-effective strategy. Systematic portability across diverse hardware classes and to commercial FaaS providers remains future work.
+All experiments run on a single commodity x86 machine with a consumer-grade Gen4 NVMe SSD and a single Linux kernel version. Absolute microsecond latencies depend on the hardware, kernel, and runtime. The cost-accounting methodology is intended to transfer to platforms sharing the same warm-process, cold-data model. Whether the first-query effectiveness of the prefetched page sets carries over to a genuine FaaS runtime is an empirical question we test directly with an Apache OpenWhisk deployment (Section~\ref{sec:eval-portability}). On OpenWhisk, all 41 workstation cells with strong first-query effectiveness (relative first-query reduction $R_{\text{ws}}\ge0.30$) remain effective. Across the 55 matched first-query cells, continuous first-query effectiveness ranks show substantial but imperfect agreement (Spearman $\rho\approx0.76$ to $0.81$), with 46 of 55 categorical direction agreement. This validates deployability and first-query effectiveness portability, not cross-platform end-to-end ranking, using the frozen non-pooled evidence defined in Section~\ref{sec:setup-openwhisk}. The OpenWhisk fresh-handle paired first-query (a per-invocation handle mode, not the external-warmer deployment boundary of the cost model) is a deployment-feasibility and first-query effectiveness signal, not an absolute strategy-performance estimate. In particular, our measurements characterize the local-storage tier that production object-storage architectures interpose as a cache layer (e.g., Cloudflare D1's local-disk caching over R2~\cite{CloudflareD1}). The purely remote tier replaces the OS page cache with VFS-level range requests, changing the mechanism while preserving the dependent-fault-chain structure and multiplying per-fault cost by three to four orders of magnitude. This FaaS-runtime validation runs on a separate commodity x86 host with its own consumer NVMe and a different Linux kernel, so it exercises the container-based runtime together with its host rather than isolating the runtime dimension or establishing hardware portability. The few per-cell disagreements are confined to strategies neutral on at least one platform and to position-sensitive cells (Section~\ref{sec:eval-portability}). None is a regression of a workstation-effective strategy. Systematic portability across diverse hardware classes and to commercial FaaS providers remains future work.
 
 Our stable \texttt{Dump} fast-path anchor exhibits approximately 10\% to 15\% session-to-session absolute drift. Individual latency cells can shift more substantially across machine-state groups. Diagnostics associate this drift with SSD internal state and CPU thermal conditions. The \texttt{Dump} anchor's first-query latency is independent of the workload key distribution, so we use it to monitor drift and anchor every effect estimate to a same-batch baseline. We never compare absolute latency across independent batches.
 
@@ -856,7 +867,7 @@ The warm-process model differs from a full cold reboot by approximately 1 to 3 \
 
 \section{Conclusion}\label{sec:conclusion}
 
-Serverless functions backed by SQLite experience a persistent cold-start bottleneck when the OS page cache is empty after idle periods, making the first query orders of magnitude slower than subsequent ones. Our central argument is methodological: evaluating cold-start prefetch by post-prefetch first-query latency alone is insufficient, because the prefetch preprocessing itself lies on the user-visible critical path. Once that preprocessing is charged (decomposed into open and deliver terms under a warm-process/integrated and an external-warmer deployment boundary), the strategy ranking changes: the cache-dump strategy that minimizes first-query latency, \texttt{Dump}, regresses end-to-end cold starts by roughly an order of magnitude on broad workloads due to deliver overhead of 0.8 to 7 ms. The design point that survives this accounting is frugal coverage. A small-footprint set covering the interior navigation path (\texttt{Skel}, footprint under 2 MB) achieves roughly $25$ to $30\%$ warm-process end-to-end improvement across the evaluated pure-hit workloads, robust across seeds. Hot leaves help only under an independently verified concentrated hotspot (raising Scattered-Zipf from about $-25\%$ to $-36\%$ under genuine Zipfian skew). Crucially, at matched footprint a frequency-ranked dump is statistically indistinguishable from the type-aware selector, so what carries the result is footprint and sound coverage rather than selector sophistication. Structural page-type knowledge remains valuable as an interpretable coverage guarantee and because structural coverage stays stable when the read hotspot moves, whereas a frozen frequency plan decays. A mixed tail-boundary workload whose range is roughly half not-found high-key probes yields a larger but narrowly scoped, bimodal result driven by a rightmost-leaf hotspot. A matched pure-hit control returns to the coverage regime. We additionally show that physical page reordering does not translate into end-to-end wins, and that the small offset-ordered structural heuristic \texttt{Skel-5}, distinct from observed interior coverage (\texttt{Skel}), is unreliable, falling into tie or directional-toward-regression under cross-seed validation. The unreliability is specific to that small offset-order heuristic, not to interior coverage. Consequently, no single strategy stack is universally optimal: the right choice is conditional on the deployment model and the workload's hotspot structure, with interior-navigation coverage on the original layout as the robust default. Finally, these conclusions are not confined to our measurement harness: on a genuine, separate-host FaaS runtime (Apache OpenWhisk), the relative effectiveness ordering is preserved. Every strongly-effective workstation strategy remains effective (41 of 41 first-query cells) and per-cell effectiveness ranks correlate at Spearman $\rho\approx0.76$ to $0.81$, over a full 65-of-65 cell coverage, a bounded relative-effectiveness result rather than a claim of hardware portability or commercial-FaaS validation.
+Serverless functions backed by SQLite experience a persistent cold-start bottleneck when the OS page cache is empty after idle periods, making the first query orders of magnitude slower than subsequent ones. Our central argument is methodological: evaluating cold-start prefetch by post-prefetch first-query latency alone is insufficient, because the prefetch preprocessing itself lies on the user-visible critical path. Once that preprocessing is charged (decomposed into open and deliver terms under a warm-process/integrated and an external-warmer deployment boundary), the strategy ranking changes: the cache-dump strategy that minimizes first-query latency, \texttt{Dump}, regresses end-to-end cold starts by roughly an order of magnitude on broad workloads due to deliver overhead of 0.8 to 7 ms. The design point that survives this accounting is frugal coverage. A small-footprint set covering the interior navigation path (\texttt{Skel}, footprint under 2 MB) achieves roughly $25$ to $30\%$ warm-process end-to-end improvement across the evaluated pure-hit workloads, robust across seeds. Hot leaves help only under an independently verified concentrated hotspot (raising Scattered-Zipf from about $-25\%$ to $-36\%$ under genuine Zipfian skew). Crucially, at matched footprint a frequency-ranked dump is statistically indistinguishable from the type-aware selector, so what carries the result is footprint and sound coverage rather than selector sophistication. Structural page-type knowledge remains valuable as an interpretable coverage guarantee and because structural coverage stays stable when the read hotspot moves, whereas a frozen frequency plan decays. A mixed tail-boundary workload whose range is roughly half not-found high-key probes yields a larger but narrowly scoped, bimodal result driven by a rightmost-leaf hotspot. A matched pure-hit control returns to the coverage regime. We additionally show that physical page reordering does not translate into end-to-end wins, and that the small offset-ordered structural heuristic \texttt{Skel-5}, distinct from observed interior coverage (\texttt{Skel}), is unreliable, falling into tie or directional-toward-regression under cross-seed validation. The unreliability is specific to that small offset-order heuristic, not to interior coverage. Consequently, no single strategy stack is universally optimal: the right choice is conditional on the deployment model and the workload's hotspot structure, with interior-navigation coverage on the original layout as the robust default. Finally, the end-to-end design conclusions are established by the controlled workstation experiments. The separate-host OpenWhisk deployment provides complementary evidence that the mechanism remains deployable and that its first-query effectiveness signal is broadly consistent on a genuine FaaS runtime: all 41 strong-workstation first-query cells remain effective and per-cell first-query effectiveness ranks correlate at Spearman $\rho\approx0.76$ to $0.81$, over a full 65-of-65 cell coverage. This is a first-query effectiveness portability result, not a cross-platform end-to-end or hardware-portability claim.
 
 To our knowledge, this is the first work to quantify the first-query versus end-to-end trade-off in SQLite-backed serverless cold starts at OS-syscall granularity. The framework is non-intrusive, operating entirely at the application layer with standard OS interfaces, and is designed to operate within the execution constraints of FaaS and edge environments.
 
