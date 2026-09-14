@@ -717,13 +717,13 @@ low $\rho$ is not a portability failure.
 \toprule
 \textbf{Workload} & \textbf{Cells} & \textbf{Spearman $\rho$} & \textbf{Direction agree} \\
 \midrule
-Scattered-Zipf  & 10 & 0.77 & 9/10  \\
-Uniform-100K    & 10 & 0.87 & 7/10  \\
-Hashed-Hotspot  & 10 & 0.82 & 8/10  \\
-Tail-Mixed      & 14 & 0.70 & 11/14 \\
-Tail-Hit        & 11 & 0.25 & 11/11 \\
+Scattered-Zipf-600K   & 10 & 0.77 & 9/10  \\
+Uniform-600K          & 10 & 0.87 & 7/10  \\
+Hotspot-1\%-scattered & 10 & 0.82 & 8/10  \\
+Tail-Mixed            & 14 & 0.70 & 11/14 \\
+Tail-Hit              & 11 & 0.25 & 11/11 \\
 \midrule
-\textbf{All}    & 55 & 0.76 & 46/55 \\
+\textbf{All}          & 55 & 0.76 & 46/55 \\
 \bottomrule
 \end{tabular}
 \caption{Per-workload cross-platform first-query effectiveness portability
@@ -732,11 +732,15 @@ continuous first-query effectiveness ranking ($R$), while direction agreement
 counts cells whose effective/neutral/harmful classification (thresholding $R$ at
 $\pm0.10$) matches on both platforms. High rank correlation can therefore coexist
 with lower classification agreement when cells lie near a classification
-threshold. Uniform-100K illustrates this: despite high rank agreement ($\rho =
+threshold. Uniform-600K illustrates this: despite high rank agreement ($\rho =
 0.87$), three near-boundary cells cross the categorical threshold, reducing
 direction agreement to 7 of 10. Tail-Hit's low $\rho$ reflects a saturated
 pure-hit control (all cells effective on both platforms), not a portability
-failure.}
+failure. Scattered-Zipf-600K, Uniform-600K and Hotspot-1\%-scattered are native
+YCSB 0.17.0 traces (workload-C read mix over a 600K-key space, with zipfian,
+uniform and 1\%-hotspot request distributions); they are the external-validity
+counterparts of the controlled Scattered-Zipf and Uniform-100K of
+Section~\ref{sec:eval-fq}, not the same workloads.}
 \label{tab:portability}
 \end{table}
 
@@ -744,7 +748,7 @@ The disagreements are few and benign. Nine of the 55 first-query cells differ in
 classification across platforms, and every one is at the neutral margin or in a
 low-sample or position-sensitive cell rather than a strong-workstation failure.
 The single strategy that is harmful under OpenWhisk, \texttt{Skel-5} on
-Hashed-Hotspot ($R_{\text{ws}} \approx +0.03 \to R_{\text{ow}} \approx -0.60$),
+Hotspot-1\%-scattered ($R_{\text{ws}} \approx +0.03 \to R_{\text{ow}} \approx -0.60$),
 is workstation-neutral to begin with, so it is not a strong strategy that broke.
 Four cells are position-sensitive (their baseline-first and target-first
 subsets disagree in sign) and are reported as balanced-batch descriptive
