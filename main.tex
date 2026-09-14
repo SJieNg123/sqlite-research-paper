@@ -279,7 +279,7 @@ The full cache dump also serves as a stability anchor, because it loads the enti
 
 \section{Prefetch Strategy Design}\label{sec:strategy}
 
-\subsection{Two-Lever Selection: A Structural Interior Skeleton and a Conditional Leaf Bonus}\label{sec:dual-lever}
+\subsection{Two Selection Levers: Interior Skeleton and Conditional Leaf Bonus}\label{sec:dual-lever}
 
 After cache clearing and before the first query executes, our framework issues \texttt{madvise(MADV\_WILLNEED)} hints for a selected set of pages. The delivery mechanism, whether asynchronous hints or synchronous \texttt{pread}, is orthogonal to the selection logic and was isolated in Section~\ref{sec:selection-delivery}. What distinguishes our strategies is solely which pages are selected for prefetching.
 
