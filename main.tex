@@ -137,6 +137,8 @@ Serverless cold start is characterized at the platform level by container reuse~
 \centering
 \small
 \setlength{\tabcolsep}{5pt}
+\caption{
+Positioning against prior art ($\checkmark$ full, $\checkmark$* partial, $\times$ absent). Structural targeting: B+tree page-type or access-frequency awareness. Cost accounting: open and deliver preprocessing charged to the end-to-end critical path. Non-intrusive: no SQLite, kernel, or FTL source modification.}
 \begin{tabular}{@{}l ccc@{}}
 \toprule
 \textbf{Approach} & \shortstack{\textbf{Structural}\\\textbf{targeting}} & \shortstack{\textbf{Cost}\\\textbf{accounting}} & \shortstack{\textbf{Non-intrusive}\\\textbf{deployment}} \\
@@ -149,8 +151,6 @@ Learned prefetch~\cite{Chen2021,Yi2026} & $\checkmark$* & $\times$ & $\times$ \\
 \textbf{Our work} & $\checkmark$ & $\checkmark$ & $\checkmark$ \\
 \bottomrule
 \end{tabular}
-\caption{
-Positioning against prior art ($\checkmark$ full, $\checkmark$* partial, $\times$ absent). Structural targeting: B+tree page-type or access-frequency awareness. Cost accounting: open and deliver preprocessing charged to the end-to-end critical path. Non-intrusive: no SQLite, kernel, or FTL source modification.}
 \label{tab:capability}
 \end{table}
 
@@ -307,6 +307,7 @@ All observation-based sets (\texttt{Skel, Skel+K, Dump}) come from the offline p
 % ---------------------------------------------------------------------------
 \begin{table*}[htbp]
 \centering
+\caption{Prefetch strategies evaluated in this study, with set sizes measured on the reference database. Swept variants append the parameter \texttt{(Skel+10, Skel+500, Dump-14)}, and the \texttt{-static} suffix marks a frozen plan. Layouts \texttt{(Default, Vacuum, Clustered)} are defined in Section~\ref{sec:layout}, and the delivery-order arms \texttt{(LP-sorted, LP-shuf)} in Section~\ref{sec:eval-attribution}.}
 \begin{tabular}{p{0.1\linewidth} p{0.12\linewidth} p{0.45\linewidth} p{0.20\linewidth}}
 \toprule
 \textbf{Strategy} & \textbf{Lever} & \textbf{Selection logic} & \textbf{Prefetch set size} \\
@@ -319,7 +320,6 @@ All observation-based sets (\texttt{Skel, Skel+K, Dump}) come from the offline p
 \texttt{Dump} & None (cache dump) & Full resident working set after workload warmup & $\sim$17.7 MB (Scattered-Zipf-100K/Uniform-100K), $\sim$1.8 MB for Tail-Mixed \\
 \bottomrule
 \end{tabular}
-\caption{Prefetch strategies evaluated in this study, with set sizes measured on the reference database. Swept variants append the parameter \texttt{(Skel+10, Skel+500, Dump-14)}, and the \texttt{-static} suffix marks a frozen plan. Layouts \texttt{(Default, Vacuum, Clustered)} are defined in Section~\ref{sec:layout}, and the delivery-order arms \texttt{(LP-sorted, LP-shuf)} in Section~\ref{sec:eval-attribution}.}
 \label{tab:strategies}
 \end{table*}
 
@@ -360,17 +360,17 @@ Table~\ref{tab:workloads} lists the primary workloads. Three read-only workloads
 
 \begin{table}[htbp]
 \centering
+\caption{Primary workloads. The three read workloads are latency-measured, and Mixed-Mutation Churn only ages the database between probes.}
 \begin{tabular}{p{0.15\linewidth}p{0.35\linewidth}p{0.35\linewidth}}
 \toprule
 \textbf{Workload} & \textbf{Access pattern} & \textbf{Serverless scenario} \\
 \midrule
 Scattered-Zipf-100K & Zipfian point reads (skewed, permuted key space) & Function-local hot-key lookups, e.g., user configuration or cache keys \\
 Uniform-100K & Uniform random point reads & Random-access point lookups, e.g., analytics point sampling over the key space \\
-Tail-Mixed & Mixed tail-boundary reads: uniform over a high-key range whose upper $\sim$half exceeds the maximum id, so $\sim$50\% of lookups are not-found probes concentrated on the rightmost leaf & Existence / boundary checks, e.g., idempotency or deduplication probes against a high-key range \\
+Tail-Mixed & Uniform point reads over ids 590,000 to 609,999, about half not-found and concentrated on the rightmost leaf & Existence / boundary checks, e.g., idempotency or deduplication probes against a high-key range \\
 Mixed-Mutation Churn & Write-heavy mutation schedule (\emph{not} a measured workload) & Ages the database via writes, used only in the churn robustness experiments (Section~\ref{sec:eval-robustness}) \\
 \bottomrule
 \end{tabular}
-\caption{Primary workloads. The three read workloads are latency-measured, and Mixed-Mutation Churn only ages the database between probes.}
 \label{tab:workloads}
 \end{table}
 
@@ -404,6 +404,7 @@ Figure~\ref{fig:firstq-bars} plots each strategy's paired first-query reduction 
 \centering
 \small
 \renewcommand{\arraystretch}{1.2}
+\caption{First-query improvement ceiling by workload. Ceiling is the best interior-only reduction (\texttt{Skel} or \texttt{Skel-92}), and the second column is the best reduction with hot leaves or the full dump.}
 \begin{tabular}{>{\raggedright\arraybackslash}p{0.28\linewidth}
                 >{\centering\arraybackslash}p{0.18\linewidth}
                 >{\raggedright\arraybackslash}p{0.43\linewidth}}
@@ -415,7 +416,6 @@ Uniform-100K        & $-44\%$ & \texttt{Dump}: $-86\%$ \\
 Tail-Mixed          & $-38\%$ & \texttt{Skel+10}: $-83\%$, \texttt{Dump}: $-91\%$ \\
 \bottomrule
 \end{tabular}
-\caption{First-query improvement ceiling by workload. Ceiling is the best interior-only reduction (\texttt{Skel} or \texttt{Skel-92}), and the second column is the best reduction with hot leaves or the full dump.}
 \label{tab:ceiling}
 \end{table}
 
@@ -438,6 +438,7 @@ The deployment model decides whether prefetching pays at all. In the external-wa
 
 \begin{table}[htbp]
 \centering
+\caption{Preprocessing cost by strategy, from a separate overhead-decomposition batch whose open medians (193 to 222 \textmu s) differ from the main batch's 179 \textmu s by cross-batch drift. $t_\text{open}$ is constant per layout, and $t_\text{deliver}$ scales with set size.}
 \begin{tabular}{l r r l}
 \toprule
 \textbf{Strategy} & $t_{\text{open}}$ & $t_{\text{deliver}}$ & \textbf{Dominant term} \\
@@ -450,7 +451,6 @@ The deployment model decides whether prefetching pays at all. In the external-wa
 \texttt{Dump} & $\sim$220 \textmu s & 0.8--7 ms & deliver \\
 \bottomrule
 \end{tabular}
-\caption{Preprocessing cost by strategy, from a separate overhead-decomposition batch whose open medians (193 to 222 \textmu s) differ from the main batch's 179 \textmu s by cross-batch drift. $t_\text{open}$ is constant per layout, and $t_\text{deliver}$ scales with set size.}
 \label{tab:overhead}
 \end{table}
 
@@ -462,7 +462,7 @@ The deployment model decides whether prefetching pays at all. In the external-wa
 \newcolumntype{L}[1]{>{\hsize=#1\hsize\raggedright\arraybackslash}X}
 \newcolumntype{C}[1]{>{\hsize=#1\hsize\centering\arraybackslash}X}
 \newcolumntype{R}[1]{>{\hsize=#1\hsize\raggedleft\arraybackslash}X}
-
+\caption{End-to-end latency under the external-warmer (\texttt{e2e\_ext}) and warm-process (\texttt{e2e\_warm}) models, main batch, \texttt{Default} layout, asynchronous delivery. Every value is from one machine state under the corrected tie-break. \texttt{Skel+10} and \texttt{Skel+500} are plotted in Figure~\ref{fig:e2e-stacked}. Percentages are single-instantiation paired improvements, and verdicts are the cross-seed classifications of Section~\ref{sec:eval-robustness}.}
 \begin{tabularx}{\textwidth}{L{0.5} *{4}{C{0.65}} L{2.5}}
 \toprule
 \multirow{2}{*}{\textbf{Strategy}} & 
@@ -478,7 +478,6 @@ Baseline        & 503            & 503            & 1072          & 1072        
 \texttt{Dump}   & 7319 (+1355\%) & 7140 (+1319\%) & 1074 (+0\%)   & 897 ($-$16\%) & Scattered-Zipf-100K: \textit{robust} (worse), Tail-Mixed: \textit{robust} ($-$7\%) \\
 \bottomrule
 \end{tabularx}
-\caption{End-to-end latency under the external-warmer (\texttt{e2e\_ext}) and warm-process (\texttt{e2e\_warm}) models, main batch, \texttt{Default} layout, asynchronous delivery. Every value is from one machine state under the corrected tie-break. \texttt{Skel+10} and \texttt{Skel+500} are plotted in Figure~\ref{fig:e2e-stacked}. Percentages are single-instantiation paired improvements, and verdicts are the cross-seed classifications of Section~\ref{sec:eval-robustness}.}
 \label{tab:e2e-ac}
 \end{table*}
 
@@ -507,6 +506,7 @@ Table~\ref{tab:ablation} gives the corrected ablation on Tail-Mixed. \texttt{Ske
 
 \begin{table}[htbp]
 \centering
+\caption{Corrected ablation on Tail-Mixed, 10-seed means with $95\%$ bootstrap CIs. \texttt{leaf\_rand\_K10} matches \texttt{leaf\_freq\_K10} in page count and type and differs only in selection criterion.}
 \begin{tabular}{l c r r}
 \toprule
 \textbf{Arm} & \textbf{Pages} & \textbf{First-query $\Delta\%$} & \textbf{$\text{e2e}_{\text{warm}}$ $\Delta\%$} \\
@@ -517,12 +517,12 @@ Table~\ref{tab:ablation} gives the corrected ablation on Tail-Mixed. \texttt{Ske
 \texttt{Skel+10} & 14 & $-63\%$ $[-75, -51]$ & $-55\%$ (bimodal) \\
 \bottomrule
 \end{tabular}
-\caption{Corrected ablation on Tail-Mixed, 10-seed means with $95\%$ bootstrap CIs. \texttt{leaf\_rand\_K10} matches \texttt{leaf\_freq\_K10} in page count and type and differs only in selection criterion.}
 \label{tab:ablation}
 \end{table}
 
 \begin{table*}[htbp]
 \centering
+\caption{Frequency-ranked partial dump versus targeted prefetch, warm-process end-to-end, 10-seed means with $95\%$ bootstrap CIs. The Scattered-Zipf-100K and Uniform-100K columns are from the prior-art batch, whose \texttt{Skel+10} values the corrected rerun reproduces within noise. The \texttt{Tail-Mixed Skel+10}, \texttt{Dump-14}, and \texttt{Dump} values are from the corrected rerun. \texttt{Dump-500} was not re-measured.}
 \begin{tabular}{l l r r r}
 \toprule
 \textbf{Arm} & \textbf{Footprint} & \textbf{Scattered-Zipf-100K} & \textbf{Uniform-100K} & \textbf{Tail-Mixed} \\
@@ -533,7 +533,6 @@ Table~\ref{tab:ablation} gives the corrected ablation on Tail-Mixed. \texttt{Ske
 \texttt{Dump} (full dump) & $\sim$4400 pages & $+762\%$ $[+674, +899]$ & $+730\%$ $[+644, +848]$ & $-7\%$ $[-12, -2]$ \\
 \bottomrule
 \end{tabular}
-\caption{Frequency-ranked partial dump versus targeted prefetch, warm-process end-to-end, 10-seed means with $95\%$ bootstrap CIs. The Scattered-Zipf-100K and Uniform-100K columns are from the prior-art batch, whose \texttt{Skel+10} values the corrected rerun reproduces within noise. The \texttt{Tail-Mixed Skel+10}, \texttt{Dump-14}, and \texttt{Dump} values are from the corrected rerun. \texttt{Dump-500} was not re-measured.}
 \label{tab:competitive}
 \end{table*}
 
@@ -555,6 +554,7 @@ We test the headline conclusions along six axes, each on its own batch, so compa
 
 \begin{table*}[htbp]
 \centering
+\caption{Cross-seed validation of warm-process improvements. Single-workload values are main-batch point estimates, cross-seed values are 10-seed bootstrap means with $95\%$ CIs, and verdicts follow Section~\ref{sec:methodology} with the fraction of seeds agreeing in sign. †Tail-Mixed \texttt{Skel+10} is bimodal: about $-70\%$ when the first query is a not-found probe and about $-31\%$ when it is a hit.}
 \begin{tabular}{l c c c}
 \toprule
 \textbf{Cell} & \textbf{Single workload} & \textbf{Cross-seed mean} & \textbf{Verdict} \\
@@ -569,7 +569,6 @@ Scattered-Zipf-100K \texttt{Skel-5} & $-13\%$ & $-5\%$ $[-16, +4]$ & \textit{tie
 Uniform-100K \texttt{Skel-5} & $-34\%$ & $-1\%$ $[-12, +7]$ & \textit{directional} (8/10 regress) \\
 \bottomrule
 \end{tabular}
-\caption{Cross-seed validation of warm-process improvements. Single-workload values are main-batch point estimates, cross-seed values are 10-seed bootstrap means with $95\%$ CIs, and verdicts follow Section~\ref{sec:methodology} with the fraction of seeds agreeing in sign. †Tail-Mixed \texttt{Skel+10} is bimodal: about $-70\%$ when the first query is a not-found probe and about $-31\%$ when it is a hit.}
 \label{tab:seeds}
 \end{table*}
 
@@ -591,6 +590,7 @@ The nine cells that change classification all sit at the neutral margin or are l
 
 \begin{table}[htbp]
 \centering
+\caption{Per-workload first-query effectiveness portability, workstation versus OpenWhisk. Spearman $\rho$ measures rank agreement in $R$, and direction agreement counts cells whose effective / neutral / harmful class (thresholds at $\pm0.10$) matches on both platforms. The three native traces are defined in Section~\ref{sec:workloads}.}
 \begin{tabular}{lccc}
 \toprule
 \textbf{Workload} & \textbf{Cells} & \textbf{Spearman $\rho$} & \textbf{Direction agree} \\
@@ -604,7 +604,6 @@ Tail-Hit              & 11 & 0.25 & 11/11 \\
 \textbf{All}          & 55 & 0.76 & 46/55 \\
 \bottomrule
 \end{tabular}
-\caption{Per-workload first-query effectiveness portability, workstation versus OpenWhisk. Spearman $\rho$ measures rank agreement in $R$, and direction agreement counts cells whose effective / neutral / harmful class (thresholds at $\pm0.10$) matches on both platforms. The three native traces are defined in Section~\ref{sec:workloads}.}
 \label{tab:portability}
 \end{table}
 
