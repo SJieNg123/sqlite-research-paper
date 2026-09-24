@@ -428,9 +428,9 @@ Our evaluation answers three questions. \textbf{RQ1}: does a lower first-query l
 
 \subsection{First-Query Gains and Workload-Dependent Ceilings}\label{sec:eval-fq}
 
-We first report first-query latency alone, before charging preprocessing in Section~\ref{sec:eval-tradeoff}. Against the cold baselines of Section~\ref{sec:workloads} (500, 732, and 1067 \textmu s), Dump reaches the lowest first-query latency on every workload: 99 \textmu s on Scattered-Zipf-100K ($-80\%$), 100 \textmu s on Uniform-100K ($-86\%$), and 94 \textmu s on Tail-Mixed ($-91\%$). Judged by this metric alone, Dump wins outright. The targeted strategies reach $-27\%$ to $-83\%$, with a ceiling that depends on the workload (Table~\ref{tab:ceiling} and Figure~\ref{fig:firstq-bars}).
+We first report first-query latency alone, before charging preprocessing in Section~\ref{sec:eval-tradeoff}. Against the cold baselines of Section~\ref{sec:workloads} (492, 734, and 1013 \textmu s), Dump reaches the lowest first-query latency on every workload: 96 \textmu s on Scattered-Zipf-100K ($-80\%$), 97 \textmu s on Uniform-100K ($-87\%$), and 91 \textmu s on Tail-Mixed ($-91\%$). Judged by this metric alone, Dump wins outright. The targeted strategies reach $-23\%$ to $-83\%$, with a ceiling that depends on the workload (Table~\ref{tab:ceiling} and Figure~\ref{fig:firstq-bars}).
 
-The ceiling has a structural explanation. At first-query time every page is cold, and interior prefetching removes the interior faults but leaves the first leaf fault. On Scattered-Zipf-100K the interior skeleton alone captures most of the benefit ($-27\%$ to $-28\%$), and adding leaves yields diminishing returns: \texttt{Skel+500} reaches $-64\%$ and Dump $-80\%$. On Uniform-100K there is no hot set, every query hits a cold leaf, and interior-only prefetching is capped at $-44\%$, with only the full dump going further, to $-86\%$. On Tail-Mixed the interior-only ceiling is $-38\%$, but \texttt{Skel+10} reaches $-83\%$ because about half the queries are not-found probes that descend to the same rightmost leaf, which \texttt{Skel+10} includes. This is a property of the key range rather than of tail reads in general, as Section~\ref{sec:eval-attribution} confirms with a pure-hit control.
+The ceiling has a structural explanation. At first-query time every page is cold, and interior prefetching removes the interior faults but leaves the first leaf fault. On Scattered-Zipf-100K the interior skeleton alone captures most of the benefit ($-27\%$ to $-33\%$), and adding leaves yields diminishing returns: \texttt{Skel+500} reaches $-63\%$ and Dump $-80\%$. On Uniform-100K there is no hot set, every query hits a cold leaf, and interior-only prefetching is capped at $-45\%$, with only the full dump going further, to $-87\%$. On Tail-Mixed the interior-only ceiling is $-36\%$, but \texttt{Skel+10} reaches $-83\%$ because about half the queries are not-found probes that descend to the same rightmost leaf, which \texttt{Skel+10} includes. This is a property of the key range rather than of tail reads in general, as Section~\ref{sec:eval-attribution} confirms with a pure-hit control.
 
 The offset-ordered structural strategy \texttt{Skel-N} depends on both workload and layout. On Scattered-Zipf-100K and Uniform-100K the first five interior pages already reach the plateau ($-27\%$ to $-28\%$ and $-44\%$), and further interiors add nothing. Tail-Mixed needs nearly all 92, because the interiors covering its high-key range sit mid-file and offset-order selection reaches them only when N spans the whole set. A single page ($N = 1$) is counter-productive on Scattered-Zipf-100K, where \texttt{madvise} dispatch overhead exceeds the coverage gain and first-query latency is $31\%$ worse than the same-batch baseline, and only marginally helpful on the other two workloads. The shape of the N-sweep is consistent across the hotspot variants in our artifact.
 
@@ -447,9 +447,9 @@ Figure~\ref{fig:firstq-bars} plots each strategy's paired first-query reduction 
 \toprule
 \textbf{Workload} & \textbf{Ceiling} & \textbf{With hot leaves / full dump} \\
 \midrule
-Scattered-Zipf-100K & $-28\%$ & \texttt{Skel+500}: $-64\%$, \texttt{Dump}: $-80\%$ \\
-Uniform-100K        & $-44\%$ & \texttt{Dump}: $-86\%$ \\
-Tail-Mixed          & $-38\%$ & \texttt{Skel+10}: $-83\%$, \texttt{Dump}: $-91\%$ \\
+Scattered-Zipf-100K & $-33\%$ & \texttt{Skel+500}: $-63\%$, \texttt{Dump}: $-80\%$ \\
+Uniform-100K        & $-45\%$ & \texttt{Dump}: $-87\%$ \\
+Tail-Mixed          & $-36\%$ & \texttt{Skel+10}: $-83\%$, \texttt{Dump}: $-91\%$ \\
 \bottomrule
 \end{tabular}
 \label{tab:ceiling}
@@ -466,7 +466,7 @@ Tail-Mixed          & $-38\%$ & \texttt{Skel+10}: $-83\%$, \texttt{Dump}: $-91\%
 
 First-query latency excludes the cost of the prefetch itself. Table~\ref{tab:overhead} decomposes that cost per strategy. The cold-open cost $t_\text{open}$ is a per-layout constant, about 179 \textmu s in the main batch and independent of strategy and workload. Because the two deployment models of Section ~\ref{sec:cost-model} differ only by $t_{\text{open}}$, it shifts both models' zero points equally ($e2e_{\text{ext}} - (\text{baseline} + t_{\text{open}}) = e2e_{\text{warm}} - \text{baseline}$) and never decides a within-model comparison. The delivery cost $t_\text{deliver}$ scales with the prefetch set: 68 to 124 \textmu s for \texttt{Skel-5}, \texttt{Skel}, and \texttt{Skel+10}, 0.5 to 0.85 ms for \texttt{Skel+500}, and 0.8 to 7 ms for \texttt{Dump}, which pays about 7 ms on the two 100K workloads and 0.80 ms on Tail-Mixed.
 
-Charging $t_\text{deliver}$ reverses the ranking of Section~\ref{sec:eval-fq}. Table~\ref{tab:e2e-ac} gives end-to-end latency under both models for the main batch, and Figure~\ref{fig:e2e-stacked} stacks first query and delivery for the warm-process model. \texttt{Dump}, the first-query winner, is the end-to-end loser on the broad workloads: on Scattered-Zipf-100K its 7 ms delivery dwarfs its 401 \textmu s first-query gain, regressing the warm-process cold start by $+1330\%$ (7148 versus 500 \textmu s) and the external-warmer cold start by $+1366\%$, and on Uniform-100K it regresses by $+882\%$. Tail-Mixed, whose working set is only 1.8 MB, is the sole exception at $-20\%$ (cross-seed $-10\%$, robust). Over-provisioning leaves fails the same way in miniature: \texttt{Skel+500} regresses by $+106\%$ and $+79\%$ on the two broad workloads.
+Charging $t_\text{deliver}$ reverses the ranking of Section~\ref{sec:eval-fq}. Table~\ref{tab:e2e-ac} gives end-to-end latency under both models for the main batch, and Figure~\ref{fig:e2e-stacked} stacks first query and delivery for the warm-process model. \texttt{Dump}, the first-query winner, is the end-to-end loser on the broad workloads: on Scattered-Zipf-100K its 7 ms delivery dwarfs its 401 \textmu s first-query gain, regressing the warm-process cold start by $+1330\%$ (7148 versus 500 \textmu s) and the external-warmer cold start by $+1366\%$, and on Uniform-100K it regresses by $+882\%$. Tail-Mixed, whose working set is only 1.8 MB, is the sole exception at $-20\%$ (cross-seed $-10\%$, robust). Over-provisioning leaves fails the same way in miniature: \texttt{Skel+500} regresses by $+115\%$ and $+77\%$ on the two broad workloads.
 
 The frugal strategies \texttt{Skel} and \texttt{Skel+10} improve warm-process latency on all three workloads. The robust general result is \texttt{Skel} at roughly $25\%$ to $30\%$ across the pure-hit workloads (cross-seed, Section~\ref{sec:eval-robustness}). Tail-Mixed \texttt{Skel+10} shows a larger single-instantiation $-75\%$ (1067 to 262 \textmu s), but Section~\ref{sec:eval-attribution} shows this is driven by the not-found rightmost-leaf concentration and is bimodal across seeds with a mean of $-55\%$. The single-instantiation wins of \texttt{Skel-5} do not survive cross-seed validation: tie on Scattered-Zipf-100K, directional toward regression on Uniform-100K, and robustly worse on Tail-Mixed (Table~\ref{tab:e2e-ac}).
 
@@ -502,16 +502,16 @@ The deployment model decides whether prefetching pays at all. In the external-wa
 \begin{tabularx}{\textwidth}{L{0.5} *{4}{C{0.65}} L{2.5}}
 \toprule
 \multirow{2}{*}{\textbf{Strategy}} & 
-\multicolumn{2}{c}{\shortstack{\textbf{Scattered-Zipf-100K}\\(baseline 500\,\textmu s)}} & 
-\multicolumn{2}{c}{\shortstack{\textbf{Tail-Mixed}\\(baseline 1067\,\textmu s)}} & 
+\multicolumn{2}{c}{\shortstack{\textbf{Scattered-Zipf-100K}\\(baseline 492\,\textmu s)}} & 
+\multicolumn{2}{c}{\shortstack{\textbf{Tail-Mixed}\\(baseline 1013\,\textmu s)}} & 
 \multirow{2}{*}{\textbf{Cross-seed verdict}} \\
 \cmidrule(lr){2-3} \cmidrule(lr){4-5}
 & $\text{e2e}_{\text{ext}}$ & $\text{e2e}_{\text{warm}}$ & $\text{e2e}_{\text{ext}}$ & $\text{e2e}_{\text{warm}}$ & \\
 \midrule
-Baseline        & 500            & 500            & 1067          & 1067          & n/a \\
-\texttt{Skel-5} & 581 (+16\%)   & 433 ($-$13\%)  & 1291 (+21\%)  & 1108 (+4\%)   & Scattered-Zipf-100K: \textit{tie}, Tail-Mixed: \textit{robust} (worse) \\
-\texttt{Skel}   & 624 (+25\%)   & 446 ($-$11\%)  & 909 ($-$15\%) & 728 ($-$32\%) & Scattered-Zipf-100K: \textit{robust} ($-$27\%), Tail-Mixed: \textit{robust} ($-$37\%) \\
-\texttt{Dump}   & 7325 (+1366\%) & 7148 (+1330\%) & 1000 ($-$6\%)  & 856 ($-$20\%) & Scattered-Zipf-100K: \textit{robust} (worse), Tail-Mixed: \textit{robust} ($-$10\%) \\
+Baseline        & 492            & 492            & 1013          & 1013          & n/a \\
+\texttt{Skel-5} & 644 (+31\%)   & 451 ($-$8\%)   & 1326 (+31\%)  & 1099 (+8\%)   & Scattered-Zipf-100K: \textit{tie}, Tail-Mixed: \textit{robust} (worse) \\
+\texttt{Skel}   & 647 (+32\%)   & 414 ($-$16\%)  & 905 ($-$11\%) & 719 ($-$29\%) & Scattered-Zipf-100K: \textit{robust} ($-$27\%), Tail-Mixed: \textit{robust} ($-$37\%) \\
+\texttt{Dump}   & 7306 (+1386\%) & 7076 (+1339\%) & 1030 (+2\%)    & 846 ($-$16\%) & Scattered-Zipf-100K: \textit{robust} (worse), Tail-Mixed: \textit{robust} ($-$9\%) \\
 \bottomrule
 \end{tabularx}
 \label{tab:e2e-ac}
@@ -568,7 +568,7 @@ to what a cold start can afford to transfer.
 
 \textbf{Delivery order.} libprefetch's contribution is ordering at a fixed set (Section~\ref{sec:os-prefetch}). We deliver the same 18 MB working set as \texttt{Dump} in ascending file-offset order (\texttt{LP-sorted}) and shuffled (\texttt{LP-shuf}). On NVMe the ordering effect survives only in the synchronous delivery term, where \texttt{pread} is $10$ to $15 \times$ slower shuffled than sorted ($14.7\times$, $14.8\times$, and $10.3\times$ on the three workloads), and first-query latency is unchanged because both arms deliver the same pages. Asynchronous \texttt{fadvise} dispatch shows no ordering effect (delivery ratio about 1.0). Delivery scheduling is therefore orthogonal to set selection.
 
-\textbf{Learned prefetching.} In the lineage of Chen et al.~\cite{Chen2021}, we train a first-order Markov page-transition model that computes finite-horizon expected visits from the root and prefetches the top $N$, evaluated with leave-one-seed-out cross-validation over the 10 seeds. At matched footprint it reduces first-query latency by $-39.6\%$, $-36.6\%$, and $-65.4\%$ on the three workloads, every CI excluding zero. It ties frequency ranking and targeted prefetch on Uniform-100K and Tail-Mixed, and on Scattered-Zipf-100K it reaches about $-40\%$ against about $-51\%$ for the same-budget arms, with overlapping CIs. The learned model shows no advantage over the simpler frequency-ranked baseline.
+\textbf{Learned prefetching.} In the lineage of Chen et al.~\cite{Chen2021}, we train a first-order Markov page-transition model that computes finite-horizon expected visits from the root and prefetches the top $N$, evaluated with leave-one-seed-out cross-validation over the 10 seeds. At matched footprint it reduces first-query latency by $-38.0\%$, $-36.8\%$, and $-65.7\%$ on the three workloads, every CI excluding zero. It ties frequency ranking and targeted prefetch on Uniform-100K and Tail-Mixed, and on Scattered-Zipf-100K it reaches about $-40\%$ against about $-51\%$ for the same-budget arms, with overlapping CIs. The learned model shows no advantage over the simpler frequency-ranked baseline.
 
 \textbf{Physical layout.} Measured in the same batch as Table~\ref{tab:e2e-ac}, the best
 warm-process end-to-end latency for \texttt{Default} versus \texttt{Clustered} is 414 versus
@@ -662,14 +662,14 @@ unranked full dump, and frugal coverage does not.
 \toprule
 \textbf{Cell} & \textbf{Single workload} & \textbf{Cross-seed mean} & \textbf{Verdict} \\
 \midrule
-Tail-Mixed \texttt{Skel+10} & $-75\%$\textsuperscript{$\dagger$} & $-55\%$ $[-68, -43]$ & \textit{robust, bimodal} \\
-Tail-Mixed \texttt{Skel} & $-32\%$ & $-37\%$ $[-39, -34]$ & \textit{robust} (10/10) \\
-Scattered-Zipf-100K \texttt{Skel+10} & $-9\%$ & $-38\%$ $[-52, -24]$ & \textit{robust} (10/10) \\
-Scattered-Zipf-100K \texttt{Skel} & $-11\%$ & $-27\%$ $[-31, -23]$ & \textit{robust} (10/10) \\
-Uniform-100K \texttt{Skel} & $-32\%$ & $-26\%$ $[-33, -16]$ & \textit{robust} (9/10) \\
-Uniform-100K \texttt{Skel+10} & $-30\%$ & $-26\%$ $[-32, -17]$ & \textit{robust} (9/10) \\
-Scattered-Zipf-100K \texttt{Skel-5} & $-13\%$ & $-5\%$ $[-15, +5]$ & \textit{tie} (6/10) \\
-Uniform-100K \texttt{Skel-5} & $-35\%$ & $-2\%$ $[-12, +6]$ & \textit{directional} (8/10 regress) \\
+Tail-Mixed \texttt{Skel+10} & $-75\%$\textsuperscript{$\dagger$} & $-57\%$ $[-68, -46]$ & \textit{robust, bimodal} \\
+Tail-Mixed \texttt{Skel} & $-29\%$ & $-37\%$ $[-40, -34]$ & \textit{robust} (10/10) \\
+Scattered-Zipf-100K \texttt{Skel+10} & $-8\%$ & $-38\%$ $[-52, -25]$ & \textit{robust} (10/10) \\
+Scattered-Zipf-100K \texttt{Skel} & $-16\%$ & $-27\%$ $[-31, -23]$ & \textit{robust} (10/10) \\
+Uniform-100K \texttt{Skel} & $-33\%$ & $-26\%$ $[-33, -16]$ & \textit{robust} (9/10) \\
+Uniform-100K \texttt{Skel+10} & $-31\%$ & $-25\%$ $[-31, -15]$ & \textit{robust} (9/10) \\
+Scattered-Zipf-100K \texttt{Skel-5} & $-8\%$ & $-5\%$ $[-15, +5]$ & \textit{tie} (6/10) \\
+Uniform-100K \texttt{Skel-5} & $-35\%$ & $-1\%$ $[-11, +7]$ & \textit{directional} (8/10 regress) \\
 \bottomrule
 \end{tabular}
 \label{tab:seeds}
