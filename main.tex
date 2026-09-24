@@ -219,9 +219,45 @@ The \texttt{madvise(MADV\_WILLNEED)} hint is asynchronous. The kernel records th
     \text{delivery\_loss} = t_{\text{fq,async}} - t_{\text{fq,pread}}
 \end{equation}
 
-The synchronous mode is not a deployable strategy, since its blocking transfer adds millisecond-scale preprocessing, and serves only as a bound. Our evaluation reports the asynchronous mode as the deployable baseline. Mechanisms between the two, such as issuing hints earlier in the function lifecycle,  \texttt{readahead(2)}, or \texttt{io\_uring}, can move delivery toward the bound and are outside our scope.
+Mechanisms between the two can move delivery toward the bound, and one of them is cheap
+enough that we adopt it as a third mode rather than defer it. Because the kernel honours a
+range hint only up to its readahead window, issuing one hint per window-sized chunk turns a
+single large request into a sequence the kernel satisfies in full. We call this
+\textit{window-chunked} asynchronous delivery, and Section~\ref{sec:eval-attribution}
+reports every strategy under it alongside the per-page mode. Mechanisms that need a
+different submission interface, such as \texttt{io\_uring}, or a different point in the
+function lifecycle remain outside our scope.
 
-Two details of the asynchronous path affect the measurements. First, the kernel readahead window (\texttt{read\_ahead\_kb} = 128 on our platform) caps a single range hint at roughly 64 pages, and on the default layout we observe only 32 of 92 requested interior pages delivered from one range hint. All per-page strategies in Section~\ref{sec:strategy} issue one hint per page and are unaffected. We keep \texttt{read\_ahead\_kb} at its default, record it with every run, and do not sweep it. Second, the harness times the first query immediately after the hints are issued. To test whether this understates delivery, we inserted sleeps of 5, 20, and 50 ms between hint dispatch and the first query for three representative strategies on two workloads (Section~\ref{sec:workloads}). The prefetch set is already fully resident at zero sleep, and the gap of Eq.~\ref{eq:delivery_loss} on the skewed workload is unchanged across sleep durations, with identical major-fault counts in both modes. The gap is therefore a persistent cost difference rather than a timing artifact. Its cause is a conjecture: synchronous reads may warm the kernel's readahead state more than one-shot hints, and confirming this would require root access to sweep \texttt{read\_ahead\_kb}, which our environment lacks.
+Two details of the asynchronous path affect the measurements. First, the kernel readahead
+window bounds what one range hint can deliver. With \texttt{read\_ahead\_kb} = 128 on our
+platform the window is $W = 32$ pages, and one
+\texttt{posix\_fadvise(POSIX\_FADV\_WILLNEED)} over a range of $n$ pages delivers
+$\min(n, W)$ pages from the head of that range while returning success either way.
+\texttt{POSIX\_FADV\_SEQUENTIAL} doubles $W$ to 64. This is why we observe only 32 of 92
+requested interior pages delivered from one range hint on the default layout. All per-page
+strategies in Section~\ref{sec:strategy} issue one hint per page and are unaffected, and the
+window-chunked mode of Section~\ref{sec:selection-delivery} restores full delivery for
+range-based sets by cutting every request to $W$ pages. We keep \texttt{read\_ahead\_kb} at
+its default, record it with every run, and do not sweep it, because raising it needs root
+that our environment lacks.
+
+Second, the harness times the first query immediately after the hints are issued, so the
+residency it samples measures how much asynchronous readahead has \textit{completed} at that
+instant rather than how much was requested. That quantity scales with how long an arm spent
+issuing, which makes it incomparable across arms and across layouts. The per-page mode reads
+$100\%$ partly because its 4,400 separate calls occupy 7.0 ms, during which its own readahead
+finishes, whereas window-chunked delivery reads 84 percent after only 1.9 ms of issuing. The
+same artifact appears on the layout axis, where a 500-page scattered set reads between 20 and
+57 percent on the reordered layouts while delivering every page it asked for, and the reading
+for one such cell moved from $100\%$ to $57\%$ between two batches of identical code. Grace
+periods of 5, 20 and 50 ms between hint dispatch and the first query resolve the question.
+Window-chunked delivery reaches $100\%$ residency at 5 ms and gains nothing beyond it, and
+first-query latency is flat at about 97 \textmu s at every grace value under both modes, so
+the pages still in flight at the zero-grace sample land during query setup and cost nothing.
+Comparisons therefore use first-query and end-to-end latency, never the residency ratio. The
+gap of Eq.~\ref{eq:delivery_loss} on the skewed workload is itself unchanged across grace
+durations with identical major-fault counts, so it is a persistent cost difference rather
+than a timing artifact.
 
 %\begin{table}[htbp]
 %\centering
@@ -496,13 +532,60 @@ Table~\ref{tab:ablation} gives the corrected ablation on Tail-Mixed. \texttt{Ske
 
 \textbf{Why the Tail-Mixed result is narrow.} About half of Tail-Mixed's lookups are not-found probes, and every one descends the right edge to the same rightmost leaf, an extreme key-range-induced hotspot. The corrected \texttt{Skel+10} result is accordingly bimodal: about $-71\%$ when the measured first query is itself a not-found probe and about $-32\%$, the interior-skeleton regime, when it is a hit, for a mean of $-55\%$. On the matched pure-hit control Tail-Hit, \texttt{Skel+10} returns to about $-27\%$, statistically matching \texttt{Skel} ($-28.5\%$) and a footprint-matched frequency dump ($-30.6\%$). Once the not-found concentration is removed, leaf frequency adds nothing beyond the skeleton. We report the Tail-Mixed number as a scoped, mechanism-specific result.
 
-\textbf{Competitive baselines.} To test whether \texttt{Dump} is a weak baseline, we port the selection cores of two prior systems (Section~\ref{sec:buffer-warming}) onto our substrate and charge them the same way. \texttt{Dump} is the full-working-set core of InnoDB's buffer-pool dump and load. \texttt{Dump-N} is a frequency-ranked partial dump in the spirit of Pre-Buffer: it replays each query's root-to-leaf traversal, counts page visits, and dumps the top $N$ pages for $N$ in {14, 28, 100, 500, full}. We reproduce only the selection, not the off-critical-path orchestration of either system. Table~\ref{tab:competitive} reports warm-process end-to-end results, and three findings follow. End-to-end latency worsens monotonically with dump footprint: the full dump regresses by $+767\%$ on Scattered-Zipf-100K and $+722\%$ on Uniform-100K (cross-seed, versus $+1330\%$ single-instantiation in Table~\ref{tab:e2e-ac}), so the problem is delivery volume rather than the dump mechanism. At matched footprint a small ranked dump ties Skel+10 on the broad workloads (Scattered-Zipf-100K $-31\%$ versus $-38\%$, Uniform-100K $-27\%$ versus $-26\%$, overlapping CIs). On Tail-Mixed the corrected comparison is a tie as well ($-55\%$ versus $-55\%$), and the pre-fix gap of $-72\%$ versus $-57\%$ was first-op leakage. Explicit page typing and frequency ranking recover a similar page set, so page-type knowledge earns its place as an interpretable coverage guarantee rather than as a faster selector.
+\textbf{Competitive baselines.} To test whether \texttt{Dump} is a weak baseline, we port the
+selection cores of two prior systems (Section~\ref{sec:buffer-warming}) onto our substrate and
+charge them the same way. \texttt{Dump} is the full-working-set core of InnoDB's buffer-pool
+dump and load. \texttt{Dump-N} is a frequency-ranked partial dump in the spirit of Pre-Buffer.
+It replays each query's root-to-leaf traversal, counts page visits, and dumps the top $N$ pages
+for $N$ in {14, 28, 100, 500, full}. We reproduce only the selection, not the off-critical-path
+orchestration of either system. Table~\ref{tab:competitive} reports warm-process end-to-end
+results under both delivery modes. Under per-page delivery, end-to-end latency worsens
+monotonically with dump footprint. The full dump regresses by $+770\%$ on Scattered-Zipf-100K
+and $+724\%$ on Uniform-100K, so the problem is delivery volume rather than the dump mechanism.
+At matched footprint a small ranked dump ties \texttt{Skel+10} on every workload
+(Scattered-Zipf-100K $-31\%$ versus $-38\%$, Uniform-100K $-26\%$ versus $-25\%$, Tail-Mixed
+$-57\%$ versus $-57\%$, all with overlapping CIs). Explicit page typing and frequency ranking
+recover a similar page set, so page-type knowledge earns its place as an interpretable coverage
+guarantee rather than as a faster selector.
+
+\textbf{Delivery mechanism.} Selection and delivery are separate axes, and the fair test
+charges every arm the stronger mechanism. Window-chunked delivery cuts the full dump's delivery
+term from 7.0 ms to 1.9 ms on the two 100K-key workloads, from 0.76 ms to 0.22 ms on Tail-Mixed
+and from 1.40 ms to 0.42 ms on the pure-hit control, moving it from $+770\%$ to $+150\%$ on
+Scattered-Zipf-100K, from $+724\%$ to $+137\%$ on Uniform-100K, from $-9\%$ to $-66\%$ on
+Tail-Mixed, and from $+72\%$ to $-41\%$ on the pure-hit control. The same mechanism moves
+\texttt{Skel+10} only from 98 to 33 \textmu s, because its ranges already sit at or below the
+window. That asymmetry is the finding. A mechanism that makes delivery cheap helps whoever was
+delivering the most, so it rewrites the baseline far more than it rewrites our own arms. The
+consequence is a split verdict. On the two broad workloads targeted selection still wins by a
+wide margin under the same mechanism, $-45\%$ and $-33\%$ against $+150\%$ and $+137\%$, because
+a 17.7 MB transfer still costs 1.9 ms for pages no query touches. On the two tail workloads,
+whose working sets are small enough that the transfer is cheap once chunked, the full dump
+overtakes us, $-66\%$ against our $-62\%$ on Tail-Mixed and $-41\%$ against our $-35\%$ on the
+pure-hit control. We therefore report window-chunked delivery as the deployable default, and we
+state the scope of the targeted-prefetch claim as workloads whose working set is large relative
+to what a cold start can afford to transfer.
 
 \textbf{Delivery order.} libprefetch's contribution is ordering at a fixed set (Section~\ref{sec:os-prefetch}). We deliver the same 18 MB working set as \texttt{Dump} in ascending file-offset order (\texttt{LP-sorted}) and shuffled (\texttt{LP-shuf}). On NVMe the ordering effect survives only in the synchronous delivery term, where \texttt{pread} is $10$ to $16 \times$ slower shuffled than sorted ($15.6\times$, $15.1\times$, and $10.5\times$ on the three workloads), and first-query latency is unchanged because both arms deliver the same pages. Asynchronous \texttt{fadvise} dispatch shows no ordering effect (delivery ratio about 1.0). Delivery scheduling is therefore orthogonal to set selection.
 
 \textbf{Learned prefetching.} In the lineage of Chen et al.~\cite{Chen2021}, we train a first-order Markov page-transition model that computes finite-horizon expected visits from the root and prefetches the top $N$, evaluated with leave-one-seed-out cross-validation over the 10 seeds. At matched footprint it reduces first-query latency by $-39.6\%$, $-36.6\%$, and $-65.4\%$ on the three workloads, every CI excluding zero. It ties frequency ranking and targeted prefetch on Uniform-100K and Tail-Mixed, and on Scattered-Zipf-100K it reaches about $-40\%$ against about $-51\%$ for the same-budget arms, with overlapping CIs. The learned model shows no advantage over the simpler frequency-ranked baseline.
 
-\textbf{Physical layout.} In no cell does \texttt{Clustered} beat \texttt{Default} when combined with access-pattern prefetch. In the layout-pair batch, whose absolute values are not comparable with Table~\ref{tab:e2e-ac}, the best warm-process end-to-end latency for \texttt{Default} versus \texttt{Clustered} is 452 versus 523 \textmu s on Scattered-Zipf-100K, 509 versus 701 \textmu s on Uniform-100K, and 265 versus 317 \textmu s on Tail-Mixed. \texttt{Clustered} shows slightly larger percentages for structural prefetch (\texttt{Skel-92} first-query $-32\%$ versus $-30\%$ on Scattered-Zipf-100K), but the synchronous first-query floor is 187 \textmu s under both layouts, and the difference comes entirely from a baseline raised by $26\%$ (523 to 658 \textmu s) as leaves move to higher offsets. On Tail-Mixed, \texttt{Clustered} raises \texttt{Skel}'s interior count from 4 to 48 pages and lowers the improvement from $-75\%$ to $-63\%$. \texttt{Clustered} could be net-positive only if prefetch is definitely deployed, only structural selection is available, and the workload is skewed enough for the interior gain to outweigh the leaf-offset penalty, a combination none of our cells meets. The \texttt{.dbi} side file of Section ~\ref{sec:serverless-coldstart} reaches the same conclusion by copying navigation pages instead of reordering them. We therefore recommend \texttt{Default}.
+\textbf{Physical layout.} Measured in the same batch as Table~\ref{tab:e2e-ac}, the best
+warm-process end-to-end latency for \texttt{Default} versus \texttt{Clustered} is 414 versus
+507 \textmu s on Scattered-Zipf-100K, 475 versus 670 \textmu s on Uniform-100K, and 253 versus
+302 \textmu s on Tail-Mixed. The layout interacts with the selection strategy rather than with
+prefetch as a whole. For the strategies we recommend, \texttt{Clustered} is worse and the effect
+is consistent across instantiations. \texttt{Skel+10} is $1.07\times$ slower under
+\texttt{Clustered} on Scattered-Zipf-100K on all 10 seeds and $1.12\times$ slower on Tail-Mixed
+on 8 of 10. For pure interior selection the sign reverses. \texttt{Skel-92} on Tail-Mixed is
+$0.88\times$ under \texttt{Clustered} on all 10 seeds, because clustering raises the interior
+page count the skeleton captures from 4 pages to 48. The synchronous first-query floor is
+unchanged by layout at 183 versus 181 \textmu s, so the layout changes which pages a strategy
+finds rather than how fast they can be delivered. We therefore recommend \texttt{Default} for
+the strategies of Section~\ref{sec:strategy}, and note \texttt{Clustered} as the better pairing
+in the one case where only structural selection is available and the workload is tail-heavy.
+The \texttt{.dbi} side file of Section~\ref{sec:serverless-coldstart} reaches the same
+conclusion by copying navigation pages instead of reordering them.
 
 \begin{table}[htbp]
 \centering
@@ -550,7 +633,20 @@ We test the headline conclusions along six axes, each on its own batch, so compa
 
 \textbf{Cadence and shared cache.} With \texttt{mmap(MAP\_SHARED)} one background warmer re-warms the set for every process sharing the page cache. At a 1 s or 5 s cadence, first-query latency holds at 26 and 29 \textmu s. At 30 s or never it regresses to 281 to 305 \textmu s, near baseline. The cadence trades warmth for I/O and CPU, and the operator picks a point from the workload's query interval.
 
-\textbf{Database size.} On the $10\times$ database (Section~\ref{sec:refdb}, separate batch) all 18 workload-strategy cells keep their direction and are robust. The end-to-end sensitivity is confined to dump-style strategies on Tail-Mixed, whose resident working set grows from 483 to 984 pages and doubles delivery cost: \texttt{Dump} goes from $-9\%$ to $+139\%$ and \texttt{Skel+500} from $-31\%$ to $+35\%$, while \texttt{Skel} remains a robust win at both sizes. The delivery trap worsens with size, and frugal coverage does not.
+\textbf{Database size.} On the $10\times$ database (Section~\ref{sec:refdb}), measured in the
+same batch as Table~\ref{tab:e2e-ac}, 28 of 36 workload-strategy cells keep their direction.
+Targeted prefetch does not merely hold at scale, it improves. \texttt{Skel} moves from $-27\%$
+to $-52\%$ on Scattered-Zipf-100K, from $-26\%$ to $-52\%$ on Uniform-100K, and from $-37\%$ to
+$-50\%$ on Tail-Mixed, and \texttt{Skel+10} moves from $-57\%$ to $-80\%$ on Tail-Mixed. A
+larger database raises the cold baseline without enlarging a skeleton whose delivery cost grows
+only $1.07\times$. Of the eight direction changes, five are large-footprint arms that regress at
+the reference size and become neutral at $10\times$, including \texttt{Skel+500} at $+81\%$ to
+$-3\%$ on Scattered-Zipf-100K, because the rising baseline absorbs a delivery cost that grows
+more slowly than it does. The one substantive degradation is the full dump on Tail-Mixed, whose
+resident working set doubles and whose delivery cost grows $2.05\times$, from 749 to 1534
+\textmu s, turning a $-9\%$ win into a $+29\%$ regression. \texttt{Skel-92} on Tail-Mixed also
+loses its win, from $-21\%$ to parity. The delivery trap therefore worsens with size for the
+unranked full dump, and frugal coverage does not.
 
 \begin{table*}[htbp]
 \centering
